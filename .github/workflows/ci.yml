@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install noirup
+        run: |
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
+          echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
+
+      - name: Pin nargo
+        run: noirup -v 1.0.0-beta.19
+
+      - name: Versions
+        run: nargo --version
+
+      - name: Format check
+        run: nargo fmt --check
+
+      - name: Compile workspace
+        run: nargo compile
