@@ -1,10 +1,22 @@
 //! Single source of every binding value, leaf format and salt convention.
-//! All circuits import these; the formulas are specified in docs/binding.md
-//! and must never be re-implemented elsewhere.
+//! All circuits in this repository import these rather than re-deriving
+//! them; the formulas they implement are specified in the zkICAO docs
+//! repository.
 //!
-//! Every derived value starts with a role tag so values from different
-//! roles can never be confused, and persistent values always include
-//! `domain`. `context` never enters any derived value.
+//! Every value here starts with a role tag, so a value produced for one
+//! role cannot stand in for another. Merkle internal nodes are the one
+//! untagged hash, and they are two wide while every tagged value is three
+//! wide or more, which is what keeps a leaf or a seed from being passed
+//! off as an internal node.
+//!
+//! `domain` enters every value a verifier stores or compares across
+//! sessions. `context` enters none of them: it scopes a proof to one
+//! session as a public input, and mixing it into a derived value would
+//! change that value every session.
+//!
+//! Hiding is not automatic. Where a derived value is a function of
+//! document data alone, anyone holding a copy of that data can recompute
+//! it; see `entropy_seed`.
 
 use poseidon::poseidon2::Poseidon2;
 
@@ -21,6 +33,8 @@ pub global TAG_ENTROPY: Field = 5;
 pub global TAG_COMMITMENT: Field = 6;
 
 pub global TAG_NULLIFIER: Field = 7;
+
+pub global TAG_FIELD_ENTROPY: Field = 8;
 
 pub fn hash32_to_fields(h: [u8; 32]) -> [Field; 2] {
     let mut hi: Field = 0;
@@ -54,10 +68,18 @@ pub fn dsc_commitment(dsc_pubkey_hash: Field, salt: Field) -> Field {
     Poseidon2::hash([TAG_DSC, dsc_pubkey_hash, salt], 3)
 }
 
-// sessionSalt = 0 is the persistent commitment convention (register once,
-// prove predicates later). A random salt makes each proving session
-// unlinkable.
+// The session salt is the only hiding input in the commitment chain. Its
+// absence does not merely link sessions, it removes hiding entirely:
+// entropy_seed feeds every leaf, the root and the commitment, and for MRZ
+// profiles dg_hash is SHA-256 over DG1, which is the printed machine
+// readable zone wrapped in a TLV template. A party holding a photocopy of
+// the data page could recompute the holder's commitment for a domain and
+// test it against a registry. A zero salt is therefore rejected here; a
+// persistent registry entry has to be built on a holder secret instead,
+// not on a degenerate salt.
 pub fn entropy_seed(dg_hash: [Field; 2], domain: Field, session_salt: Field) -> Field {
+    assert(session_salt != 0, "commit: session salt must be non-zero");
+
     Poseidon2::hash(
         [TAG_ENTROPY, dg_hash[0], dg_hash[1], domain, session_salt],
         5,
@@ -65,7 +87,7 @@ pub fn entropy_seed(dg_hash: [Field; 2], domain: Field, session_salt: Field) -> 
 }
 
 pub fn field_entropy(seed: Field, field_id: Field) -> Field {
-    Poseidon2::hash([seed, field_id], 2)
+    Poseidon2::hash([TAG_FIELD_ENTROPY, seed, field_id], 3)
 }
 
 pub fn leaf(field_id: Field, length: Field, data: [Field; 4], entropy: Field) -> Field {
@@ -121,10 +143,32 @@ pub fn commitment(root: Field, domain: Field) -> Field {
     Poseidon2::hash([TAG_COMMITMENT, root, domain], 3)
 }
 
-pub fn nullifier(policy_id: Field, packed: [Field; 4], domain: Field) -> Field {
+// `secret` carries whatever makes this value unguessable. Without it the
+// nullifier would be a hash of a public policy identifier, a public
+// domain and fields printed on the data page, so anyone holding a copy of
+// a document could compute its owner's nullifier for any domain and test
+// whether that person had registered: an enumeration oracle over the
+// whole registered set.
+//
+// Two properties are required of `secret`, and both matter:
+//   unguessable without access to the chip or to a keyed service, which
+//   is what closes the oracle, and not chosen by the prover, since a
+//   holder who can pick it can register twice and defeat the uniqueness
+//   the nullifier exists to provide.
+//
+// Candidate sources differ in what they cost, and the choice is a
+// protocol decision recorded in the specification, not here. Material
+// read from the chip (for example the Security Object signature) needs no
+// service but changes when a document is replaced, which is exactly the
+// stability a reissue-stable policy promises. A verifiable oblivious
+// pseudorandom function keyed by an independent service keeps that
+// stability, at the cost of depending on the service.
+pub fn nullifier(policy_id: Field, packed: [Field; 4], secret: Field, domain: Field) -> Field {
+    assert(secret != 0, "commit: nullifier secret must be non-zero");
+
     Poseidon2::hash(
-        [TAG_NULLIFIER, policy_id, packed[0], packed[1], packed[2], packed[3], domain],
-        7,
+        [TAG_NULLIFIER, policy_id, packed[0], packed[1], packed[2], packed[3], secret, domain],
+        8,
     )
 }
 
@@ -162,6 +206,25 @@ fn merkle_roundtrip_all_indices() {
 
         assert(leaf_to_root16(leaves[i], i, siblings) == root, "roundtrip mismatch");
     }
+}
+
+#[test(should_fail_with = "commit: session salt must be non-zero")]
+fn rejects_zero_session_salt() {
+    let _ = entropy_seed([1, 2], 3, 0);
+}
+
+#[test(should_fail_with = "commit: nullifier secret must be non-zero")]
+fn rejects_nullifier_without_secret() {
+    let _ = nullifier(1001, [1, 2, 3, 4], 0, 7);
+}
+
+#[test]
+fn nullifier_depends_on_secret() {
+    let a = nullifier(1001, [1, 2, 3, 4], 111, 7);
+
+    let b = nullifier(1001, [1, 2, 3, 4], 222, 7);
+
+    assert(a != b);
 }
 
 #[test]

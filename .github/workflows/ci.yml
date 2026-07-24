@@ -27,3 +27,6 @@ jobs:
 
       - name: Compile workspace
         run: nargo compile
+
+      - name: Test workspace
+        run: nargo test

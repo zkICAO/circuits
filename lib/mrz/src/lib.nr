@@ -79,22 +79,31 @@ pub fn copy<let N: u32, let M: u32>(src: [u8; N], off: u32) -> [u8; M] {
     out
 }
 
+// Doc 9303 uses the filler character in place of a check digit in two
+// routine cases: a document number longer than nine characters continues
+// into the optional data field and leaves its own check digit position as
+// filler, and an unused optional data field carries a filler check digit.
+// Requiring a digit in those positions would reject compliant documents.
+fn check_digit_ok<let N: u32>(chars: [u8; N], actual: u8, filler_allowed: bool) -> bool {
+    (check_digit(chars) == actual) | (filler_allowed & (actual == 0x3C))
+}
+
 pub fn td3_validate(mrz: [u8; 88]) {
     let doc: [u8; 9] = copy(mrz, TD3_DOC_NUMBER);
 
-    assert(check_digit(doc) == mrz[53], "mrz: td3 document number check digit");
+    assert(check_digit_ok(doc, mrz[53], true), "mrz: td3 document number check digit");
 
     let dob: [u8; 6] = copy(mrz, TD3_BIRTH_DATE);
 
-    assert(check_digit(dob) == mrz[63], "mrz: td3 birth date check digit");
+    assert(check_digit_ok(dob, mrz[63], false), "mrz: td3 birth date check digit");
 
     let exp: [u8; 6] = copy(mrz, TD3_EXPIRY_DATE);
 
-    assert(check_digit(exp) == mrz[71], "mrz: td3 expiry date check digit");
+    assert(check_digit_ok(exp, mrz[71], false), "mrz: td3 expiry date check digit");
 
     let opt: [u8; 14] = copy(mrz, TD3_OPTIONAL);
 
-    assert(check_digit(opt) == mrz[86], "mrz: td3 optional data check digit");
+    assert(check_digit_ok(opt, mrz[86], true), "mrz: td3 optional data check digit");
 
     let mut comp: [u8; 39] = [0; 39];
 
@@ -116,15 +125,15 @@ pub fn td3_validate(mrz: [u8; 88]) {
 pub fn td1_validate(mrz: [u8; 90]) {
     let doc: [u8; 9] = copy(mrz, TD1_DOC_NUMBER);
 
-    assert(check_digit(doc) == mrz[14], "mrz: td1 document number check digit");
+    assert(check_digit_ok(doc, mrz[14], true), "mrz: td1 document number check digit");
 
     let dob: [u8; 6] = copy(mrz, TD1_BIRTH_DATE);
 
-    assert(check_digit(dob) == mrz[36], "mrz: td1 birth date check digit");
+    assert(check_digit_ok(dob, mrz[36], false), "mrz: td1 birth date check digit");
 
     let exp: [u8; 6] = copy(mrz, TD1_EXPIRY_DATE);
 
-    assert(check_digit(exp) == mrz[44], "mrz: td1 expiry date check digit");
+    assert(check_digit_ok(exp, mrz[44], false), "mrz: td1 expiry date check digit");
 
     let mut comp: [u8; 50] = [0; 50];
 
@@ -162,11 +171,34 @@ fn parse_yymmdd(d: [u8; 6]) -> (u32, u32, u32) {
 
     assert((mm >= 1) & (mm <= 12), "mrz: month out of range");
 
-    assert((dd >= 1) & (dd <= 31), "mrz: day out of range");
+    assert(dd >= 1, "mrz: day out of range");
 
     (yy, mm, dd)
 }
 
+// Rejecting impossible calendar dates matters because these values feed
+// numeric predicates and identifier derivation downstream, where a date
+// like the 31st of February would otherwise look well formed.
+fn assert_day_in_month(yyyy: u32, mm: u32, dd: u32) {
+    let leap = ((yyyy % 4 == 0) & (yyyy % 100 != 0)) | (yyyy % 400 == 0);
+
+    let lengths: [u32; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    let mut limit = lengths[mm - 1];
+
+    if (mm == 2) & leap {
+        limit = 29;
+    }
+
+    assert(dd <= limit, "mrz: day out of range for month");
+}
+
+// The pivot is the current two digit year, so a birth date is read as the
+// most recent past year matching it. `current_yyyymmdd` therefore decides
+// the answer and must reach the circuit as a public input the verifier
+// sets; a prover free to choose it can move a birth date by a century.
+// Holders older than one hundred years resolve to the wrong century, a
+// limit of two digit years in the machine readable zone itself.
 pub fn birth_date_to_int(d: [u8; 6], current_yyyymmdd: u32) -> u32 {
     let (yy, mm, dd) = parse_yymmdd(d);
 
@@ -174,13 +206,21 @@ pub fn birth_date_to_int(d: [u8; 6], current_yyyymmdd: u32) -> u32 {
 
     let century = if yy > current_yy { 1900 } else { 2000 };
 
-    (century + yy) * 10000 + mm * 100 + dd
+    let yyyy = century + yy;
+
+    assert_day_in_month(yyyy, mm, dd);
+
+    yyyy * 10000 + mm * 100 + dd
 }
 
 pub fn expiry_date_to_int(d: [u8; 6]) -> u32 {
     let (yy, mm, dd) = parse_yymmdd(d);
 
-    (2000 + yy) * 10000 + mm * 100 + dd
+    let yyyy = 2000 + yy;
+
+    assert_day_in_month(yyyy, mm, dd);
+
+    yyyy * 10000 + mm * 100 + dd
 }
 
 fn td3_specimen() -> [u8; 88] {
@@ -280,4 +320,34 @@ fn expiry_date_is_2000s() {
 #[test(should_fail_with = "mrz: month out of range")]
 fn rejects_invalid_month() {
     let _ = expiry_date_to_int("121315".as_bytes());
+}
+
+#[test(should_fail_with = "mrz: day out of range for month")]
+fn rejects_february_thirtieth() {
+    let _ = expiry_date_to_int("270230".as_bytes());
+}
+
+#[test]
+fn accepts_leap_day_in_leap_year() {
+    assert(expiry_date_to_int("240229".as_bytes()) == 20240229);
+}
+
+#[test(should_fail_with = "mrz: day out of range for month")]
+fn rejects_leap_day_in_common_year() {
+    let _ = expiry_date_to_int("230229".as_bytes());
+}
+
+// Doc 9303 puts a filler in the check digit position when a document
+// number runs past nine characters into the optional data field.
+#[test]
+fn accepts_filler_check_digit_for_overflowing_document_number() {
+    let mut mrz = td3_specimen();
+
+    mrz[53] = 0x3C;
+
+    let doc: [u8; 9] = copy(mrz, TD3_DOC_NUMBER);
+
+    assert(check_digit_ok(doc, mrz[53], true));
+
+    assert(!check_digit_ok(doc, mrz[53], false));
 }

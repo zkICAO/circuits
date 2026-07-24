@@ -2,6 +2,11 @@
 //! One wrapper per (algorithm, curve); the message hash length is generic
 //! so SHA-1..SHA-512 digests all fit the same entry points.
 //!
+//! Byte deserialization in noir-bignum enforces only that a value is below
+//! 2^MOD_BITS, not that it is reduced, so each wrapper calls
+//! `validate_in_field` on the key and signature scalars it decodes rather
+//! than leaving that to callers.
+//!
 //! Low-s requirement. The ECDSA backend rejects any signature whose s
 //! exceeds n/2, and aborts rather than returning false. Certificate and
 //! CMS signatures follow RFC 5280 and RFC 5480, which place no such
@@ -14,8 +19,9 @@
 //! key over the same digest; substituting one for the other neither
 //! creates a signature the issuer did not produce nor lets a prover
 //! satisfy the circuit without one. Doing it outside the circuit keeps
-//! the gate count unchanged. The proving library and the fixture
-//! generator both apply this normalization.
+//! the gate count unchanged. Witness preparation is where it belongs, and
+//! no such code exists yet: until it does, every caller has to normalize
+//! for itself.
 
 use bigcurve::curves::brainpoolP384r1::{BrainpoolP384r1_Fq, BrainpoolP384r1_Fr};
 
@@ -42,6 +48,14 @@ pub fn verify_ecdsa_p256<let H: u32>(
 
     let s: Secp256r1_Fr = Secp256r1_Fr::from_be_bytes(sig_s);
 
+    x.validate_in_field();
+
+    y.validate_in_field();
+
+    r.validate_in_field();
+
+    s.validate_in_field();
+
     assert(verify_secp256r1_ecdsa(x, y, msg_hash, (r, s)), "sig: ecdsa p256 verification failed");
 }
 
@@ -60,6 +74,14 @@ pub fn verify_ecdsa_p384<let H: u32>(
 
     let s: Secp384r1_Fr = Secp384r1_Fr::from_be_bytes(sig_s);
 
+    x.validate_in_field();
+
+    y.validate_in_field();
+
+    r.validate_in_field();
+
+    s.validate_in_field();
+
     assert(verify_secp384r1_ecdsa(x, y, msg_hash, (r, s)), "sig: ecdsa p384 verification failed");
 }
 
@@ -77,6 +99,14 @@ pub fn verify_ecdsa_brainpool384<let H: u32>(
     let r: BrainpoolP384r1_Fr = BrainpoolP384r1_Fr::from_be_bytes(sig_r);
 
     let s: BrainpoolP384r1_Fr = BrainpoolP384r1_Fr::from_be_bytes(sig_s);
+
+    x.validate_in_field();
+
+    y.validate_in_field();
+
+    r.validate_in_field();
+
+    s.validate_in_field();
 
     assert(
         verify_brainpoolp384r1_ecdsa(x, y, msg_hash, (r, s)),

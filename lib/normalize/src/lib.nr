@@ -1,7 +1,13 @@
 //! Field normalization: raw document bytes into the canonical values that
 //! predicates and nullifiers operate on. Dates become YYYYMMDD integers
-//! (see mrz), country codes stay ISO 3166 alpha-3, byte fields pack big
-//! endian into 4 Field elements of up to 31 bytes each.
+//! (see mrz), and byte fields pack big endian into 4 Field elements of up
+//! to 31 bytes each.
+//!
+//! Country codes keep the three letter form Doc 9303 Part 3 defines. That
+//! list extends ISO 3166-1 alpha-3 rather than matching it: it adds codes
+//! for issuing organizations and for holders without a nationality, such
+//! as XXA for refugees and UTO for the specimen state used in examples,
+//! so validation here accepts the ICAO list and not the ISO one.
 
 pub global MAX_FIELD_BYTES: u32 = 124;
 

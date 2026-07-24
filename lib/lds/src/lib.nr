@@ -1,8 +1,17 @@
 //! LDSSecurityObject helpers (SHA-256 hash algorithm variant).
 //!
 //! The Security Object (SOD eContent) commits every data group hash. These
-//! helpers assert its hash algorithm identifier and extract one data group
-//! entry with full structure checks.
+//! helpers assert its hash algorithm identifier and read one data group
+//! entry.
+//!
+//! `dg_entry_sha256` checks the DER header sitting at the offset it is
+//! given, and nothing about how that offset was reached: it does not walk
+//! the Security Object from its start, so it cannot tell a genuine entry
+//! from a byte sequence elsewhere in the buffer that happens to match the
+//! same seven header bytes. A circuit that wants that guarantee has to
+//! establish the offset itself. The hash read out is still covered by the
+//! signature over the Security Object, so a match on arbitrary bytes only
+//! yields data the issuer signed.
 
 pub global SHA256_ALGORITHM_OID: [u8; 11] =
     [0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01];
