@@ -1,2 +1,12 @@
 [workspace]
-members = ["probe"]
+members = [
+    "lib/tlv",
+    "lib/lds",
+    "lib/hash",
+    "lib/mrz",
+    "lib/normalize",
+    "lib/commit",
+    "lib/policy",
+    "lib/sig",
+    "probe",
+]
