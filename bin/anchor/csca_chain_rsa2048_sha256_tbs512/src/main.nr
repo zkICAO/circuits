@@ -7,8 +7,9 @@
 //! which is the anchor of the whole system and cannot be derived from a
 //! document.
 //!
-//! Depth eight is enough for a master list; states publish a handful of
-//! country signing certificates each.
+//! Depth ten holds 1024 country signing keys. The ICAO master list carried
+//! 572 certificates when this was written, so depth eight, which holds 256,
+//! would not have fitted the real list.
 
 fn main(
     tbs: [u8; 512],
@@ -20,7 +21,7 @@ fn main(
     authority_redc: [u128; 18],
     authority_signature: [u128; 18],
     authority_index: u32,
-    authority_siblings: [Field; 8],
+    authority_siblings: [Field; 10],
     salt: Field,
     master_list_root: pub Field,
     current_yyyymmdd: pub u32,
@@ -31,7 +32,7 @@ fn main(
 
     assert(domain != 0, "anchor: domain must be set");
 
-    anchor::prove_signer_is_certified::<512, 18, 2048, 8>(
+    anchor::prove_signer_is_certified::<512, 18, 2048, 10>(
         tbs,
         tbs_len,
         public_key_offset,
@@ -48,12 +49,12 @@ fn main(
     )
 }
 
-fn master_list() -> ([Field; 8], Field) {
-    let mut siblings: [Field; 8] = [0; 8];
+fn master_list() -> ([Field; 10], Field) {
+    let mut siblings: [Field; 10] = [0; 10];
 
     let mut current = commit::modulus_hash(testdata::CHAIN_CSCA_MODULUS_LIMBS);
 
-    for level in 0..8 {
+    for level in 0..10 {
         siblings[level] = (level as Field) + 900;
 
         current = commit::hash_pair(current, siblings[level]);

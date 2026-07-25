@@ -8,5 +8,6 @@ compiler_version = ">=1.0.0"
 commit = { path = "../commit" }
 hash = { path = "../hash" }
 mrz = { path = "../mrz" }
+predicate = { path = "../predicate" }
 normalize = { path = "../normalize" }
 testdata = { path = "../testdata" }

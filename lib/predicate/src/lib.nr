@@ -11,13 +11,7 @@
 
 use commit::{commitment, leaf, leaf_to_root16, set_entry, walk_path};
 
-pub struct FieldOpening {
-    pub field_id: u32,
-    pub length: u32,
-    pub data: [Field; 4],
-    pub entropy: Field,
-    pub siblings: [Field; 4],
-}
+pub use commit::FieldOpening;
 
 /// Proves the opening really is a field of the committed document. Exposed
 /// because the nullifier circuit needs the same guarantee before it uses a

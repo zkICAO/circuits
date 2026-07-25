@@ -56,7 +56,7 @@ fn empty_field(id: u32) -> FieldValue {
     FieldValue { id, length: 0, data: [0; 4] }
 }
 
-fn build_commitment(values: [FieldValue; 16], seed: Field, domain: Field) -> Field {
+fn build_leaves(values: [FieldValue; 16], seed: Field) -> [Field; 16] {
     let mut leaves: [Field; 16] = [0; 16];
 
     for i in 0..FIELD_COUNT {
@@ -70,7 +70,57 @@ fn build_commitment(values: [FieldValue; 16], seed: Field, domain: Field) -> Fie
         );
     }
 
-    commitment(root16(leaves), domain)
+    leaves
+}
+
+fn build_commitment(values: [FieldValue; 16], seed: Field, domain: Field) -> Field {
+    commitment(root16(build_leaves(values, seed)), domain)
+}
+
+/// The opening for one field, derived from the same leaves the commitment is
+/// built from. Used by the witness tool; a predicate takes this and proves it
+/// against the commitment.
+fn build_opening(values: [FieldValue; 16], seed: Field, field_id: u32) -> commit::FieldOpening {
+    assert(field_id >= 1, "attributes: field identifier out of range");
+
+    assert(field_id <= FIELD_COUNT, "attributes: field identifier out of range");
+
+    let leaves = build_leaves(values, seed);
+
+    let index = field_id - 1;
+
+    let mut level8: [Field; 8] = [0; 8];
+
+    for i in 0..8 {
+        level8[i] = commit::hash_pair(leaves[2 * i], leaves[2 * i + 1]);
+    }
+
+    let mut level4: [Field; 4] = [0; 4];
+
+    for i in 0..4 {
+        level4[i] = commit::hash_pair(level8[2 * i], level8[2 * i + 1]);
+    }
+
+    let mut level2: [Field; 2] = [0; 2];
+
+    for i in 0..2 {
+        level2[i] = commit::hash_pair(level4[2 * i], level4[2 * i + 1]);
+    }
+
+    let value = values[index];
+
+    commit::FieldOpening {
+        field_id,
+        length: value.length,
+        data: value.data,
+        entropy: field_entropy(seed, value.id as Field),
+        siblings: [
+            leaves[index ^ 1],
+            level8[(index / 2) ^ 1],
+            level4[(index / 4) ^ 1],
+            level2[(index / 8) ^ 1],
+        ],
+    }
 }
 
 fn check_dg1_template<let N: u32>(dg1: [u8; N], dg1_len: u32, mrz_len: u32) {
@@ -89,6 +139,14 @@ fn check_dg1_template<let N: u32>(dg1: [u8; N], dg1_len: u32, mrz_len: u32) {
     assert(dg1[4] as u32 == mrz_len, "attributes: machine readable zone length mismatch");
 }
 
+struct Parsed {
+    values: [FieldValue; 16],
+    seed: Field,
+    binding: Field,
+    birth_date: u32,
+    expiry_date: u32,
+}
+
 /// TD3 is the passport layout: two lines of 44 characters.
 pub fn td3<let N: u32>(
     dg1: [u8; N],
@@ -98,6 +156,44 @@ pub fn td3<let N: u32>(
     session_salt: Field,
     domain: Field,
 ) -> Attributes {
+    let parsed = td3_parse(dg1, dg1_len, current_yyyymmdd, session_salt, domain);
+
+    assert(
+        parsed.binding == expected_dg_binding,
+        "attributes: data group was not the authenticated one",
+    );
+
+    Attributes {
+        dg_binding: parsed.binding,
+        commitment: build_commitment(parsed.values, parsed.seed, domain),
+        birth_date: parsed.birth_date,
+        expiry_date: parsed.expiry_date,
+    }
+}
+
+/// The opening for one field of a passport, for the witness tool. It runs the
+/// same parse, so an opening cannot describe a field differently from the way
+/// the commitment committed to it.
+pub fn td3_opening<let N: u32>(
+    dg1: [u8; N],
+    dg1_len: u32,
+    current_yyyymmdd: u32,
+    session_salt: Field,
+    domain: Field,
+    field_id: u32,
+) -> commit::FieldOpening {
+    let parsed = td3_parse(dg1, dg1_len, current_yyyymmdd, session_salt, domain);
+
+    build_opening(parsed.values, parsed.seed, field_id)
+}
+
+fn td3_parse<let N: u32>(
+    dg1: [u8; N],
+    dg1_len: u32,
+    current_yyyymmdd: u32,
+    session_salt: Field,
+    domain: Field,
+) -> Parsed {
     check_dg1_template(dg1, dg1_len, mrz::TD3_MRZ_BYTES);
 
     let dg_hash = sha256_bounded(dg1, dg1_len);
@@ -105,8 +201,6 @@ pub fn td3<let N: u32>(
     let dg_hash_fields = hash32_to_fields(dg_hash);
 
     let binding = dg_binding(dg_hash_fields, domain);
-
-    assert(binding == expected_dg_binding, "attributes: data group was not the authenticated one");
 
     let mut characters: [u8; 88] = [0; 88];
 
@@ -175,11 +269,10 @@ pub fn td3<let N: u32>(
         data: normalize::pack_to_4(characters, mrz::TD3_OPTIONAL, 14),
     };
 
-    let seed = entropy_seed(dg_hash_fields, domain, session_salt);
-
-    Attributes {
-        dg_binding: binding,
-        commitment: build_commitment(values, seed, domain),
+    Parsed {
+        values,
+        seed: entropy_seed(dg_hash_fields, domain, session_salt),
+        binding,
         birth_date,
         expiry_date,
     }
@@ -391,5 +484,51 @@ fn rejects_a_card_layout_read_as_a_passport() {
         20260725,
         99,
         domain,
+    );
+}
+
+// The reason the opening and the commitment share one parse: an opening that
+// described a field differently from the way it was committed would be
+// undetectable here and would fail only inside a predicate proof.
+#[test]
+fn an_opening_proves_against_the_commitment_it_came_from() {
+    let domain = 42;
+
+    let salt = 8888;
+
+    let today = 20260725;
+
+    let out = td3(
+        testdata::TD3_DG1,
+        testdata::TD3_DG1_LEN,
+        td3_expected_binding(domain),
+        today,
+        salt,
+        domain,
+    );
+
+    for field_id in 1..10 {
+        let opening = td3_opening(
+            testdata::TD3_DG1,
+            testdata::TD3_DG1_LEN,
+            today,
+            salt,
+            domain,
+            field_id,
+        );
+
+        predicate::open_field(opening, out.commitment, domain);
+    }
+}
+
+#[test(should_fail_with = "attributes: field identifier out of range")]
+fn refuses_an_opening_for_a_field_that_does_not_exist() {
+    let _ = td3_opening(
+        testdata::TD3_DG1,
+        testdata::TD3_DG1_LEN,
+        20260725,
+        1,
+        42,
+        17,
     );
 }

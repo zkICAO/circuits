@@ -8,6 +8,7 @@
 //! the committed output is the fixture of record.
 
 mod bigint;
+mod bundle;
 mod cert;
 mod der;
 mod ec;
@@ -33,6 +34,33 @@ struct Document {
 }
 
 fn main() {
+    // Two jobs: refresh the committed fixtures, or prove a document all the
+    // way through and check the result.
+    if std::env::args().nth(1).as_deref() == Some("bundle") {
+        let circuits_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("unexpected generator location");
+
+        let out = circuits_root.join("target/bundle");
+
+        let result = bundle::build(circuits_root, &out);
+
+        println!();
+
+        println!("bundle written to {}", result.directory.display());
+
+        println!("  econtent binding {}", result.econtent_binding);
+
+        println!("  dg binding       {}", result.dg_binding);
+
+        println!("  commitment       {}", result.commitment);
+
+        println!("  secret binding   {}", result.secret_binding);
+
+        return;
+    }
+
     let out_path = target_path();
 
     let work_dir = scratch::Scratch::new("fixtures");

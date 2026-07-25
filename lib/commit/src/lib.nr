@@ -190,6 +190,18 @@ pub fn field_entropy(seed: Field, field_id: Field) -> Field {
     Poseidon2::hash([TAG_FIELD_ENTROPY, seed, field_id], 3)
 }
 
+/// One field of a committed document, together with what is needed to show
+/// it belongs there. Defined here because the leaf format is here: a
+/// consumer that built its own version of this could drift from the format
+/// the attribute circuits produce.
+pub struct FieldOpening {
+    pub field_id: u32,
+    pub length: u32,
+    pub data: [Field; 4],
+    pub entropy: Field,
+    pub siblings: [Field; 4],
+}
+
 pub fn leaf(field_id: Field, length: Field, data: [Field; 4], entropy: Field) -> Field {
     Poseidon2::hash(
         [TAG_LEAF, field_id, length, data[0], data[1], data[2], data[3], entropy],

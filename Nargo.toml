@@ -29,5 +29,6 @@ members = [
     "bin/nullifier/document_number",
     "bin/anchor/dsc_inclusion",
     "bin/anchor/csca_chain_rsa2048_sha256_tbs512",
+    "tools/mrz_opening",
     "probe",
 ]
