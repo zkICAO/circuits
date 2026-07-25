@@ -258,9 +258,7 @@ mod json {
             '[' => ']',
             _ => {
                 // A scalar: read to the next separator at this level.
-                let end = trimmed
-                    .find(|c| c == ',' || c == '}' || c == ']')
-                    .unwrap_or(trimmed.len());
+                let end = trimmed.find([',', '}', ']']).unwrap_or(trimmed.len());
 
                 return Some(text[offset..offset + end].trim().to_string());
             }
