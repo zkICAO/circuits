@@ -64,6 +64,10 @@ fn main() {
 
         println!("  secret binding   {}", result.secret_binding);
 
+        println!("  registry root    {}", result.registry_root);
+
+        println!("  nullifier        {}", result.nullifier);
+
         return;
     }
 

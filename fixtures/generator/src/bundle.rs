@@ -35,12 +35,18 @@ const TODAY: &str = "20260725";
 /// The birth date field, which a range proof turns into an age check.
 const BIRTH_DATE_FIELD: &str = "5";
 
+const ISSUING_STATE_FIELD: &str = "2";
+
+const DOCUMENT_NUMBER_FIELD: &str = "3";
+
 pub struct Bundle {
     pub directory: PathBuf,
     pub econtent_binding: String,
     pub dg_binding: String,
     pub commitment: String,
     pub secret_binding: String,
+    pub registry_root: String,
+    pub nullifier: String,
 }
 
 /// With `proving` off the chain runs without producing proofs. The links
@@ -129,6 +135,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
 
     let econtent_binding = sod[0].clone();
 
+    let dsc_commitment = sod[1].clone();
+
     let secret_binding = sod[2].clone();
 
     prove(
@@ -195,24 +203,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         proving,
     );
 
-    // 4. The witness for one field, from the tool that shares the attribute
-    //    circuit's derivation.
-    let mut witness = String::new();
-
-    bytes(&mut witness, "dg1", &dg1, DG1_BUFFER);
-    value(&mut witness, "dg1_len", &dg1.len().to_string());
-    value(&mut witness, "session_salt", SESSION_SALT);
-    value(&mut witness, "domain", DOMAIN);
-    value(&mut witness, "current_yyyymmdd", TODAY);
-    value(&mut witness, "field_id", BIRTH_DATE_FIELD);
-
-    let opening = run_circuit(circuits_root, "mrz_opening", &witness);
-
-    assert_eq!(
-        opening.len(),
-        10,
-        "the opening tool returns four data elements, a length, an entropy and four siblings"
-    );
+    // 4. The witness for the birth date field.
+    let opening = opening_for(circuits_root, &dg1, BIRTH_DATE_FIELD);
 
     // 5. Born on or before the cutoff, without saying when.
     let mut witness = String::new();
@@ -238,13 +230,117 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         proving,
     );
 
+    // 6. The signer is one this verifier trusts. The siblings stand for the
+    //    rest of a published registry; a real one supplies them from its own
+    //    tree. The leaf and the root come from the tool, so they are the same
+    //    hashes the circuit recomputes rather than a second implementation.
+    let siblings: Vec<String> = (0..16).map(|level| (level + 700).to_string()).collect();
+
+    let mut witness = String::new();
+
+    bytes(&mut witness, "pubkey_x", &key.public_x, 32);
+    bytes(&mut witness, "pubkey_y", &key.public_y, 32);
+    array(&mut witness, "siblings", &siblings);
+
+    let registry_root = run_circuit(circuits_root, "registry_witness", &witness)[1].clone();
+
+    let mut witness = String::new();
+
+    bytes(&mut witness, "pubkey_x", &key.public_x, 32);
+    bytes(&mut witness, "pubkey_y", &key.public_y, 32);
+    value(&mut witness, "salt", DSC_SALT);
+    value(&mut witness, "index", "0");
+    array(&mut witness, "siblings", &siblings);
+    value(&mut witness, "registry_root", &registry_root);
+    value(&mut witness, "domain", DOMAIN);
+    value(&mut witness, "context", CONTEXT);
+
+    let anchor = run_circuit(circuits_root, "anchor_dsc_inclusion", &witness);
+
+    assert_eq!(
+        anchor[0], dsc_commitment,
+        "the anchor must commit to the key that signed the document"
+    );
+
+    prove(
+        circuits_root,
+        out,
+        "anchor_dsc_inclusion",
+        "anchor",
+        proving,
+    );
+
+    // 7. One value per holder per application. It needs the secret that the
+    //    Security Object proof published only a binding to.
+    let mut witness = String::new();
+
+    bytes(&mut witness, "signature_r", &signature.r, 32);
+    bytes(&mut witness, "signature_s", &signature.s, 32);
+
+    let secret = run_circuit(circuits_root, "document_secret", &witness)[0].clone();
+
+    let state = opening_for(circuits_root, &dg1, ISSUING_STATE_FIELD);
+
+    let number = opening_for(circuits_root, &dg1, DOCUMENT_NUMBER_FIELD);
+
+    let mut witness = String::new();
+
+    value(&mut witness, "state_length", &state[4]);
+    array(&mut witness, "state_data", &state[0..4]);
+    value(&mut witness, "state_entropy", &state[5]);
+    array(&mut witness, "state_siblings", &state[6..10]);
+    value(&mut witness, "number_length", &number[4]);
+    array(&mut witness, "number_data", &number[0..4]);
+    value(&mut witness, "number_entropy", &number[5]);
+    array(&mut witness, "number_siblings", &number[6..10]);
+    value(&mut witness, "secret", &secret);
+    value(&mut witness, "commitment", &commitment);
+    value(&mut witness, "secret_binding", &secret_binding);
+    value(&mut witness, "domain", DOMAIN);
+    value(&mut witness, "context", CONTEXT);
+
+    let nullifier = run_circuit(circuits_root, "nullifier_document_number", &witness)[0].clone();
+
+    prove(
+        circuits_root,
+        out,
+        "nullifier_document_number",
+        "nullifier",
+        proving,
+    );
+
     Bundle {
         directory: out.to_path_buf(),
         econtent_binding,
         dg_binding,
         commitment,
         secret_binding,
+        registry_root,
+        nullifier,
     }
+}
+
+/// The opening for one field, from the tool that shares the attribute
+/// circuit's derivation.
+fn opening_for(circuits_root: &Path, dg1: &[u8], field_id: &str) -> Vec<String> {
+    let mut witness = String::new();
+
+    bytes(&mut witness, "dg1", dg1, DG1_BUFFER);
+    value(&mut witness, "dg1_len", &dg1.len().to_string());
+    value(&mut witness, "session_salt", SESSION_SALT);
+    value(&mut witness, "domain", DOMAIN);
+    value(&mut witness, "current_yyyymmdd", TODAY);
+    value(&mut witness, "field_id", field_id);
+
+    let opening = run_circuit(circuits_root, "mrz_opening", &witness);
+
+    assert_eq!(
+        opening.len(),
+        10,
+        "an opening is four data elements, a length, an entropy and four siblings"
+    );
+
+    opening
 }
 
 /// Writes a witness, solves it, and returns the circuit outputs in order.

@@ -29,4 +29,6 @@ members = [
     "bin/anchor/dsc_inclusion",
     "bin/anchor/csca_chain_rsa2048_sha256_tbs512",
     "tools/mrz_opening",
+    "tools/registry_witness",
+    "tools/document_secret",
 ]
