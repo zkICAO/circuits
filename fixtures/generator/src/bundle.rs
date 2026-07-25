@@ -43,7 +43,11 @@ pub struct Bundle {
     pub secret_binding: String,
 }
 
-pub fn build(circuits_root: &Path, out: &Path) -> Bundle {
+/// With `proving` off the chain runs without producing proofs. The links
+/// between circuits come from executing them and feeding each one's outputs
+/// into the next, so leaving proving out still catches a broken link, and it
+/// lets continuous integration run this without the backend installed.
+pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     let work = Scratch::new("bundle");
 
     let key = ec::generate(&ec::P256, &work.join("dsc.pem"));
@@ -74,7 +78,14 @@ pub fn build(circuits_root: &Path, out: &Path) -> Bundle {
         .expect("the security object must cover DG1")
         .1;
 
-    std::fs::create_dir_all(out).expect("cannot create the bundle directory");
+    // Without proving there is nothing to write, and touching the directory
+    // would leave proofs from an earlier run beside values from this one,
+    // which reads as a bundle that was checked and was not.
+    if proving {
+        std::fs::remove_dir_all(out).ok();
+
+        std::fs::create_dir_all(out).expect("cannot create the bundle directory");
+    }
 
     // 1. The issuing state signed this document.
     let mut witness = String::new();
@@ -120,7 +131,13 @@ pub fn build(circuits_root: &Path, out: &Path) -> Bundle {
 
     let secret_binding = sod[2].clone();
 
-    prove(circuits_root, out, "sod_ecdsa_p256_sha256_ec512", "sod");
+    prove(
+        circuits_root,
+        out,
+        "sod_ecdsa_p256_sha256_ec512",
+        "sod",
+        proving,
+    );
 
     // 2. That signed object commits to this data group.
     let mut witness = String::new();
@@ -149,7 +166,13 @@ pub fn build(circuits_root: &Path, out: &Path) -> Bundle {
 
     let dg_binding = run_circuit(circuits_root, "dg_extract_sha256_ec512", &witness)[0].clone();
 
-    prove(circuits_root, out, "dg_extract_sha256_ec512", "dg_extract");
+    prove(
+        circuits_root,
+        out,
+        "dg_extract_sha256_ec512",
+        "dg_extract",
+        proving,
+    );
 
     // 3. The fields of that data group, committed.
     let mut witness = String::new();
@@ -169,6 +192,7 @@ pub fn build(circuits_root: &Path, out: &Path) -> Bundle {
         out,
         "attributes_mrz_td3_sha256",
         "attributes",
+        proving,
     );
 
     // 4. The witness for one field, from the tool that shares the attribute
@@ -206,7 +230,13 @@ pub fn build(circuits_root: &Path, out: &Path) -> Bundle {
 
     run_circuit(circuits_root, "predicate_compare", &witness);
 
-    prove(circuits_root, out, "predicate_compare", "predicate_compare");
+    prove(
+        circuits_root,
+        out,
+        "predicate_compare",
+        "predicate_compare",
+        proving,
+    );
 
     Bundle {
         directory: out.to_path_buf(),
@@ -315,7 +345,13 @@ fn search(directory: &Path, package: &str) -> Option<PathBuf> {
 /// checks the proof before it goes into the bundle. A bundle containing a
 /// proof that does not verify would send anyone reading it in the wrong
 /// direction.
-fn prove(circuits_root: &Path, out: &Path, package: &str, name: &str) {
+fn prove(circuits_root: &Path, out: &Path, package: &str, name: &str, proving: bool) {
+    if !proving {
+        println!("  {name}: executed");
+
+        return;
+    }
+
     let directory = out.join(name);
 
     std::fs::create_dir_all(&directory).expect("cannot create a bundle entry");

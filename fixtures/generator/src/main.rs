@@ -37,6 +37,8 @@ fn main() {
     // Two jobs: refresh the committed fixtures, or prove a document all the
     // way through and check the result.
     if std::env::args().nth(1).as_deref() == Some("bundle") {
+        let proving = std::env::args().nth(2).as_deref() != Some("--no-prove");
+
         let circuits_root = Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .and_then(|p| p.parent())
@@ -44,11 +46,15 @@ fn main() {
 
         let out = circuits_root.join("target/bundle");
 
-        let result = bundle::build(circuits_root, &out);
+        let result = bundle::build(circuits_root, &out, proving);
 
         println!();
 
-        println!("bundle written to {}", result.directory.display());
+        if proving {
+            println!("bundle written to {}", result.directory.display());
+        } else {
+            println!("chain executed, no proofs produced and nothing written");
+        }
 
         println!("  econtent binding {}", result.econtent_binding);
 

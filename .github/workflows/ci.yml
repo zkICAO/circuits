@@ -30,3 +30,16 @@ jobs:
 
       - name: Test workspace
         run: nargo test
+
+      # Executes every circuit in chain order, feeding each one's outputs into
+      # the next. A binding that stopped linking would pass the unit tests,
+      # which check circuits in isolation, and fail here. Proving is left out
+      # so this needs no backend.
+      - name: Check the chain links
+        run: cargo run --manifest-path fixtures/generator/Cargo.toml -- bundle --no-prove
+
+      - name: Generator tests
+        run: cargo test --manifest-path fixtures/generator/Cargo.toml
+
+      - name: Generator lint
+        run: cargo clippy --manifest-path fixtures/generator/Cargo.toml --all-targets -- -D warnings

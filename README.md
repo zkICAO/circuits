@@ -80,6 +80,10 @@ The off-chain verifier consumes the result. It returns what a bundle proved, not
 
 Pinned versions and dependency tags: see [TOOLCHAIN.md](TOOLCHAIN.md).
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report a vulnerability privately: [SECURITY.md](SECURITY.md).
+
 ## Trademarks
 
 See [TRADEMARKS.md](TRADEMARKS.md).
