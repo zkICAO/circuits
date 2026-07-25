@@ -1,0 +1,10 @@
+[package]
+name = "sod_ecdsa_p256_sha256_ec512"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+sig = { path = "../../../lib/sig" }
+sod = { path = "../../../lib/sod" }
+testdata = { path = "../../../lib/testdata" }

@@ -1,0 +1,233 @@
+//! Generates synthetic ICAO Doc 9303 test vectors and writes them out as a
+//! Noir library, so circuit tests run against a complete signed document
+//! without reading files at proving time.
+//!
+//! The documents are synthetic: keys are generated here and the specimen
+//! machine readable zones are the ones Doc 9303 publishes as examples. No
+//! genuine document is involved, and regenerating produces a fresh key, so
+//! the committed output is the fixture of record.
+
+mod der;
+mod ec;
+mod icao;
+
+use std::fmt::Write as _;
+use std::path::{Path, PathBuf};
+
+const ECONTENT_BUFFER: usize = 512;
+
+const SIGNED_ATTRS_BUFFER: usize = 256;
+
+const DG1_BUFFER: usize = 128;
+
+struct Document {
+    prefix: &'static str,
+    mrz: &'static str,
+    mrz_len: usize,
+}
+
+fn main() {
+    let out_path = target_path();
+
+    let work_dir = std::env::temp_dir().join("zkicao-fixtures");
+
+    std::fs::create_dir_all(&work_dir).expect("cannot create working directory");
+
+    let documents = [
+        Document {
+            prefix: "TD3",
+            mrz: icao::MRZ_TD3,
+            mrz_len: 88,
+        },
+        Document {
+            prefix: "TD1",
+            mrz: icao::MRZ_TD1,
+            mrz_len: 90,
+        },
+    ];
+
+    let mut body = String::new();
+
+    body.push_str(HEADER);
+
+    for (index, document) in documents.iter().enumerate() {
+        assert_eq!(
+            document.mrz.len(),
+            document.mrz_len,
+            "specimen length mismatch"
+        );
+
+        let key = ec::generate(&ec::P256, &work_dir.join(format!("dsc{index}.pem")));
+
+        emit_document(&mut body, document, &key);
+    }
+
+    std::fs::write(&out_path, body).expect("cannot write the fixture library");
+
+    std::fs::remove_dir_all(&work_dir).ok();
+
+    println!("wrote {}", out_path.display());
+}
+
+fn target_path() -> PathBuf {
+    let generator_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    let circuits_root = generator_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("unexpected generator location");
+
+    let dir = circuits_root.join("lib/testdata/src");
+
+    std::fs::create_dir_all(&dir).expect("cannot create the testdata package");
+
+    dir.join("lib.nr")
+}
+
+fn emit_document(body: &mut String, document: &Document, key: &ec::KeyPair) {
+    let dg1 = icao::build_dg1(document.mrz);
+
+    let groups = vec![
+        icao::DataGroup {
+            number: 1,
+            content: dg1.clone(),
+        },
+        icao::DataGroup {
+            number: 2,
+            content: vec![0x5a; 96],
+        },
+    ];
+
+    let security_object = icao::build_security_object(&groups);
+
+    let signed_attrs = icao::build_signed_attributes(&security_object.econtent);
+
+    let signature = ec::sign_sha256(key, &signed_attrs.bytes);
+
+    let prefix = document.prefix;
+
+    writeln!(
+        body,
+        "// {prefix} document, signed with a generated P-256 Document Signer key."
+    )
+    .unwrap();
+
+    emit_bytes(
+        body,
+        &format!("{prefix}_MRZ"),
+        document.mrz.as_bytes(),
+        document.mrz_len,
+    );
+
+    emit_bytes(body, &format!("{prefix}_DG1"), &dg1, DG1_BUFFER);
+
+    emit_u32(body, &format!("{prefix}_DG1_LEN"), dg1.len());
+
+    emit_bytes(
+        body,
+        &format!("{prefix}_ECONTENT"),
+        &security_object.econtent,
+        ECONTENT_BUFFER,
+    );
+
+    emit_u32(
+        body,
+        &format!("{prefix}_ECONTENT_LEN"),
+        security_object.econtent.len(),
+    );
+
+    emit_u32(
+        body,
+        &format!("{prefix}_OID_OFFSET"),
+        security_object.oid_offset,
+    );
+
+    for (number, offset) in &security_object.dg_offsets {
+        emit_u32(body, &format!("{prefix}_DG{number}_OFFSET"), *offset);
+    }
+
+    emit_bytes(
+        body,
+        &format!("{prefix}_SIGNED_ATTRS"),
+        &signed_attrs.bytes,
+        SIGNED_ATTRS_BUFFER,
+    );
+
+    emit_u32(
+        body,
+        &format!("{prefix}_SIGNED_ATTRS_LEN"),
+        signed_attrs.bytes.len(),
+    );
+
+    emit_u32(
+        body,
+        &format!("{prefix}_DIGEST_OFFSET"),
+        signed_attrs.digest_offset,
+    );
+
+    emit_bytes(
+        body,
+        &format!("{prefix}_DSC_PUBKEY_X"),
+        &key.public_x,
+        key.curve.scalar_bytes,
+    );
+
+    emit_bytes(
+        body,
+        &format!("{prefix}_DSC_PUBKEY_Y"),
+        &key.public_y,
+        key.curve.scalar_bytes,
+    );
+
+    emit_bytes(
+        body,
+        &format!("{prefix}_SIGNATURE_R"),
+        &signature.r,
+        key.curve.scalar_bytes,
+    );
+
+    emit_bytes(
+        body,
+        &format!("{prefix}_SIGNATURE_S"),
+        &signature.s,
+        key.curve.scalar_bytes,
+    );
+
+    body.push('\n');
+}
+
+fn emit_bytes(body: &mut String, name: &str, value: &[u8], width: usize) {
+    assert!(
+        value.len() <= width,
+        "{name} needs {} bytes but the buffer is {width}",
+        value.len()
+    );
+
+    write!(body, "pub global {name}: [u8; {width}] = [").unwrap();
+
+    for index in 0..width {
+        if index % 16 == 0 {
+            body.push_str("\n    ");
+        }
+
+        let byte = if index < value.len() { value[index] } else { 0 };
+
+        write!(body, "0x{byte:02x}, ").unwrap();
+    }
+
+    body.push_str("\n];\n\n");
+}
+
+fn emit_u32(body: &mut String, name: &str, value: usize) {
+    writeln!(body, "pub global {name}: u32 = {value};\n").unwrap();
+}
+
+const HEADER: &str = "\
+//! Generated by fixtures/generator. Do not edit by hand.
+//!
+//! Synthetic ICAO Doc 9303 documents: a generated Document Signer key over a
+//! Security Object covering DG1 and DG2, with the specimen machine readable
+//! zones from the standard. Signature s values are normalized to at most n/2,
+//! which the circuits require and certificate signatures do not guarantee.
+
+";

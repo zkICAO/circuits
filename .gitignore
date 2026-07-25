@@ -2,3 +2,4 @@
 **/Prover.toml
 crs/
 .DS_Store
+fixtures/generator/target/

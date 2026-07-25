@@ -1,0 +1,11 @@
+[package]
+name = "sod"
+type = "lib"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+cms = { path = "../cms" }
+commit = { path = "../commit" }
+hash = { path = "../hash" }
+testdata = { path = "../testdata" }

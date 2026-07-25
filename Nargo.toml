@@ -2,11 +2,15 @@
 members = [
     "lib/tlv",
     "lib/lds",
+    "lib/cms",
     "lib/hash",
     "lib/mrz",
     "lib/normalize",
     "lib/commit",
     "lib/policy",
     "lib/sig",
+    "lib/sod",
+    "lib/testdata",
+    "bin/sod/ecdsa_p256_sha256_ec512",
     "probe",
 ]

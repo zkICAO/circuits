@@ -36,6 +36,8 @@ pub global TAG_NULLIFIER: Field = 7;
 
 pub global TAG_FIELD_ENTROPY: Field = 8;
 
+pub global TAG_DSC_KEY: Field = 9;
+
 pub fn hash32_to_fields(h: [u8; 32]) -> [Field; 2] {
     let mut hi: Field = 0;
 
@@ -58,6 +60,30 @@ pub fn econtent_binding(h: [Field; 2], domain: Field) -> Field {
 
 pub fn dg_binding(h: [Field; 2], domain: Field) -> Field {
     Poseidon2::hash([TAG_DG, h[0], h[1], domain], 4)
+}
+
+/// Packs an uncompressed public key into four field elements, splitting each
+/// coordinate in half so any curve up to 62 byte coordinates fits.
+pub fn pubkey_hash<let K: u32>(x: [u8; K], y: [u8; K]) -> Field {
+    let half = K / 2;
+
+    assert(half * 2 == K, "commit: coordinate length must be even");
+
+    assert(half <= 31, "commit: coordinate half does not fit a field element");
+
+    let mut packed: [Field; 4] = [0; 4];
+
+    for i in 0..half {
+        packed[0] = packed[0] * 256 + x[i] as Field;
+
+        packed[1] = packed[1] * 256 + x[half + i] as Field;
+
+        packed[2] = packed[2] * 256 + y[i] as Field;
+
+        packed[3] = packed[3] * 256 + y[half + i] as Field;
+    }
+
+    Poseidon2::hash([TAG_DSC_KEY, packed[0], packed[1], packed[2], packed[3]], 5)
 }
 
 // dscSalt = 0 is the public registry convention: the verifier compares the

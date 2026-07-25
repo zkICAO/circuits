@@ -1,0 +1,15 @@
+[package]
+name = "zkicao-fixtures"
+version = "0.0.1"
+edition = "2021"
+description = "Generates synthetic ICAO Doc 9303 test vectors for the zkICAO circuits"
+license = "MIT"
+publish = false
+
+# No dependencies by design: DER is emitted here and key generation, signing
+# and digests are delegated to the openssl command line tool, so the fixtures
+# are reproducible without pulling third party code into the build.
+
+[[bin]]
+name = "zkicao-fixtures"
+path = "src/main.rs"
