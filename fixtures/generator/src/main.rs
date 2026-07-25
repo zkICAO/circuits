@@ -13,6 +13,7 @@ mod der;
 mod ec;
 mod icao;
 mod rsa;
+mod scratch;
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -34,9 +35,7 @@ struct Document {
 fn main() {
     let out_path = target_path();
 
-    let work_dir = std::env::temp_dir().join("zkicao-fixtures");
-
-    std::fs::create_dir_all(&work_dir).expect("cannot create working directory");
+    let work_dir = scratch::Scratch::new("fixtures");
 
     let documents = [
         Document {
@@ -62,7 +61,7 @@ fn main() {
             "specimen length mismatch"
         );
 
-        let key = ec::generate(&ec::P256, &work_dir.join(format!("dsc{index}.pem")));
+        let key = ec::generate(&ec::P256, &work_dir.join(&format!("dsc{index}.pem")));
 
         emit_document(&mut body, document, &key);
 
@@ -76,8 +75,6 @@ fn main() {
     emit_certificate_chain(&mut body, &work_dir);
 
     std::fs::write(&out_path, body).expect("cannot write the fixture library");
-
-    std::fs::remove_dir_all(&work_dir).ok();
 
     println!("wrote {}", out_path.display());
 }
@@ -291,7 +288,7 @@ fn emit_prover_toml(document: &Document, key: &ec::KeyPair) {
 /// A complete document signed with RSA, which is what most states use. The
 /// same structures as the elliptic curve documents, so the only thing that
 /// differs downstream is the signature check.
-fn emit_rsa_document(body: &mut String, work_dir: &Path) {
+fn emit_rsa_document(body: &mut String, work_dir: &scratch::Scratch) {
     let key = rsa::generate(&work_dir.join("dsc-rsa.pem"));
 
     let dg1 = icao::build_dg1(icao::MRZ_TD3);
@@ -366,7 +363,7 @@ fn emit_rsa_document(body: &mut String, work_dir: &Path) {
 
 /// A country signing key over a Document Signer certificate, which is the
 /// link a trust chain has to check.
-fn emit_certificate_chain(body: &mut String, work_dir: &Path) {
+fn emit_certificate_chain(body: &mut String, work_dir: &scratch::Scratch) {
     let signer = ec::generate(&ec::P256, &work_dir.join("chain-dsc.pem"));
 
     let authority = rsa::generate(&work_dir.join("chain-csca.pem"));

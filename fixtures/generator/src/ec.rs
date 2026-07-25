@@ -271,9 +271,7 @@ mod tests {
 
     #[test]
     fn signing_produces_a_low_s_signature() {
-        let dir = std::env::temp_dir().join("zkicao-ec-test");
-
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = crate::scratch::Scratch::new("ec-test");
 
         let key = generate(&P256, &dir.join("k.pem"));
 
@@ -282,7 +280,5 @@ mod tests {
         assert_eq!(sig.r.len(), 32);
 
         assert!(!is_greater_than_half(&sig.s, P256.order));
-
-        std::fs::remove_dir_all(&dir).ok();
     }
 }

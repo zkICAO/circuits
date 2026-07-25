@@ -133,9 +133,7 @@ mod tests {
 
     #[test]
     fn generates_a_key_whose_limbs_round_trip() {
-        let dir = std::env::temp_dir().join("zkicao-rsa-test");
-
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = crate::scratch::Scratch::new("rsa-test");
 
         let key = generate(&dir.join("k.pem"));
 
@@ -152,7 +150,5 @@ mod tests {
         let signature = sign_sha256(&key, b"zkICAO");
 
         assert_eq!(signature.len(), LIMBS);
-
-        std::fs::remove_dir_all(&dir).ok();
     }
 }
