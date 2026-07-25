@@ -60,6 +60,10 @@ fn main() {
         let key = ec::generate(&ec::P256, &work_dir.join(format!("dsc{index}.pem")));
 
         emit_document(&mut body, document, &key);
+
+        if index == 0 {
+            emit_prover_toml(document, &key);
+        }
     }
 
     std::fs::write(&out_path, body).expect("cannot write the fixture library");
@@ -194,6 +198,101 @@ fn emit_document(body: &mut String, document: &Document, key: &ec::KeyPair) {
     );
 
     body.push('\n');
+}
+
+/// Writes the witness for the Passive Authentication circuit, so the whole
+/// pipeline can be proved and verified outside the test harness.
+fn emit_prover_toml(document: &Document, key: &ec::KeyPair) {
+    let dg1 = icao::build_dg1(document.mrz);
+
+    let groups = vec![
+        icao::DataGroup {
+            number: 1,
+            content: dg1,
+        },
+        icao::DataGroup {
+            number: 2,
+            content: vec![0x5a; 96],
+        },
+    ];
+
+    let security_object = icao::build_security_object(&groups);
+
+    let signed_attrs = icao::build_signed_attributes(&security_object.econtent);
+
+    let signature = ec::sign_sha256(key, &signed_attrs.bytes);
+
+    let mut toml = String::new();
+
+    toml_bytes(
+        &mut toml,
+        "econtent",
+        &security_object.econtent,
+        ECONTENT_BUFFER,
+    );
+
+    toml_value(&mut toml, "econtent_len", security_object.econtent.len());
+
+    toml_bytes(
+        &mut toml,
+        "signed_attrs",
+        &signed_attrs.bytes,
+        SIGNED_ATTRS_BUFFER,
+    );
+
+    toml_value(&mut toml, "signed_attrs_len", signed_attrs.bytes.len());
+
+    toml_value(&mut toml, "digest_offset", signed_attrs.digest_offset);
+
+    toml_bytes(&mut toml, "pubkey_x", &key.public_x, key.curve.scalar_bytes);
+
+    toml_bytes(&mut toml, "pubkey_y", &key.public_y, key.curve.scalar_bytes);
+
+    toml_bytes(
+        &mut toml,
+        "signature_r",
+        &signature.r,
+        key.curve.scalar_bytes,
+    );
+
+    toml_bytes(
+        &mut toml,
+        "signature_s",
+        &signature.s,
+        key.curve.scalar_bytes,
+    );
+
+    toml_value(&mut toml, "dsc_salt", 7);
+
+    toml_value(&mut toml, "domain", 42);
+
+    toml_value(&mut toml, "context", 99);
+
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("unexpected generator location")
+        .join("bin/sod/ecdsa_p256_sha256_ec512/Prover.toml");
+
+    std::fs::write(&path, toml).expect("cannot write the witness");
+
+    println!("wrote {}", path.display());
+}
+
+fn toml_bytes(out: &mut String, name: &str, value: &[u8], width: usize) {
+    write!(out, "{name} = [").unwrap();
+
+    for index in 0..width {
+        let byte = if index < value.len() { value[index] } else { 0 };
+
+        write!(out, "\"{byte}\", ").unwrap();
+    }
+
+    out.push_str("]\n");
+}
+
+fn toml_value(out: &mut String, name: &str, value: usize) {
+    writeln!(out, "{name} = \"{value}\"").unwrap();
 }
 
 fn emit_bytes(body: &mut String, name: &str, value: &[u8], width: usize) {

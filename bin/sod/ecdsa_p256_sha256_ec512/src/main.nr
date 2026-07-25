@@ -20,9 +20,11 @@ fn main(
     domain: pub Field,
     context: pub Field,
 ) -> pub (Field, Field) {
-    // Present so the proof cannot be replayed in another session. It is
-    // deliberately absent from every derived value.
-    assert(context == context);
+    // Scopes the proof to one session so it cannot be replayed in another,
+    // and stays out of every derived value so those remain stable across
+    // sessions. Requiring it to be non-zero puts a real constraint on it,
+    // rather than leaving it an input the circuit never reads.
+    assert(context != 0, "sod: context must be set");
 
     let digests = sod::link(
         econtent,

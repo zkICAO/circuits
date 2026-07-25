@@ -14,7 +14,7 @@ fn main(
     domain: pub Field,
     context: pub Field,
 ) -> pub Field {
-    assert(context == context);
+    assert(context != 0, "dg_extract: context must be set");
 
     dg_extract::extract_sha256(
         econtent,
