@@ -40,6 +40,10 @@ pub global TAG_DSC_KEY: Field = 9;
 
 pub global TAG_SET_ENTRY: Field = 10;
 
+pub global TAG_DOCUMENT_SECRET: Field = 11;
+
+pub global TAG_SECRET_BINDING: Field = 12;
+
 /// An entry in a set the verifier publishes, such as a list of accepted
 /// issuing states. Tagged like everything else so a set entry cannot be
 /// mistaken for a document leaf.
@@ -71,28 +75,58 @@ pub fn dg_binding(h: [Field; 2], domain: Field) -> Field {
     Poseidon2::hash([TAG_DG, h[0], h[1], domain], 4)
 }
 
-/// Packs an uncompressed public key into four field elements, splitting each
-/// coordinate in half so any curve up to 62 byte coordinates fits.
-pub fn pubkey_hash<let K: u32>(x: [u8; K], y: [u8; K]) -> Field {
+/// Packs two equal length byte strings into four field elements, splitting
+/// each in half so anything up to 62 bytes per string fits.
+fn pack_pair<let K: u32>(a: [u8; K], b: [u8; K]) -> [Field; 4] {
     let half = K / 2;
 
-    assert(half * 2 == K, "commit: coordinate length must be even");
+    assert(half * 2 == K, "commit: length must be even");
 
-    assert(half <= 31, "commit: coordinate half does not fit a field element");
+    assert(half <= 31, "commit: half does not fit a field element");
 
     let mut packed: [Field; 4] = [0; 4];
 
     for i in 0..half {
-        packed[0] = packed[0] * 256 + x[i] as Field;
+        packed[0] = packed[0] * 256 + a[i] as Field;
 
-        packed[1] = packed[1] * 256 + x[half + i] as Field;
+        packed[1] = packed[1] * 256 + a[half + i] as Field;
 
-        packed[2] = packed[2] * 256 + y[i] as Field;
+        packed[2] = packed[2] * 256 + b[i] as Field;
 
-        packed[3] = packed[3] * 256 + y[half + i] as Field;
+        packed[3] = packed[3] * 256 + b[half + i] as Field;
     }
 
+    packed
+}
+
+pub fn pubkey_hash<let K: u32>(x: [u8; K], y: [u8; K]) -> Field {
+    let packed = pack_pair(x, y);
+
     Poseidon2::hash([TAG_DSC_KEY, packed[0], packed[1], packed[2], packed[3]], 5)
+}
+
+/// Material that identifies one document and that only a party who read its
+/// chip can produce. The signature over the Security Object serves: it is
+/// fixed at issuance, so a prover cannot choose it, and it is not printed on
+/// the data page, so it cannot be guessed from a photocopy.
+///
+/// It does not survive reissue. A replacement document carries a different
+/// signature and therefore a different secret, which is why a policy that
+/// promises stability across reissue cannot be built on this.
+pub fn document_secret<let K: u32>(signature_r: [u8; K], signature_s: [u8; K]) -> Field {
+    let packed = pack_pair(signature_r, signature_s);
+
+    Poseidon2::hash(
+        [TAG_DOCUMENT_SECRET, packed[0], packed[1], packed[2], packed[3]],
+        5,
+    )
+}
+
+/// Published so a later circuit can prove it holds the same secret without
+/// revealing it. Scoped by domain, otherwise this value would itself be a
+/// stable per document identifier visible to every application at once.
+pub fn secret_binding(secret: Field, domain: Field) -> Field {
+    Poseidon2::hash([TAG_SECRET_BINDING, secret, domain], 3)
 }
 
 // dscSalt = 0 is the public registry convention: the verifier compares the

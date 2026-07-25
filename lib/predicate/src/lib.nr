@@ -19,6 +19,13 @@ pub struct FieldOpening {
     pub siblings: [Field; 4],
 }
 
+/// Proves the opening really is a field of the committed document. Exposed
+/// because the nullifier circuit needs the same guarantee before it uses a
+/// field value.
+pub fn open_field(opening: FieldOpening, expected_commitment: Field, domain: Field) {
+    open(opening, expected_commitment, domain);
+}
+
 fn open(opening: FieldOpening, expected_commitment: Field, domain: Field) {
     assert(opening.field_id >= 1, "predicate: field identifier out of range");
 

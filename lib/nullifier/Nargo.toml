@@ -1,0 +1,10 @@
+[package]
+name = "nullifier"
+type = "lib"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../commit" }
+policy = { path = "../policy" }
+predicate = { path = "../predicate" }

@@ -19,7 +19,7 @@ fn main(
     dsc_salt: Field,
     domain: pub Field,
     context: pub Field,
-) -> pub (Field, Field) {
+) -> pub (Field, Field, Field) {
     // Scopes the proof to one session so it cannot be replayed in another,
     // and stays out of every derived value so those remain stable across
     // sessions. Requiring it to be non-zero puts a real constraint on it,
@@ -42,9 +42,17 @@ fn main(
         signature_s,
     );
 
-    let out = sod::outputs(digests.econtent_hash, pubkey_x, pubkey_y, dsc_salt, domain);
+    let out = sod::outputs(
+        digests.econtent_hash,
+        pubkey_x,
+        pubkey_y,
+        signature_r,
+        signature_s,
+        dsc_salt,
+        domain,
+    );
 
-    (out.econtent_binding, out.dsc_commitment)
+    (out.econtent_binding, out.dsc_commitment, out.secret_binding)
 }
 
 #[test]

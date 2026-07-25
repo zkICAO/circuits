@@ -15,13 +15,17 @@
 //! own algorithm: `link` returns the digest the signature must cover, and
 //! `outputs` derives the public values once that signature has verified.
 
-use commit::{dsc_commitment, econtent_binding, hash32_to_fields, pubkey_hash};
+use commit::{
+    document_secret, dsc_commitment, econtent_binding, hash32_to_fields, pubkey_hash,
+    secret_binding,
+};
 
 use hash::sha256_bounded;
 
 pub struct SodOutput {
     pub econtent_binding: Field,
     pub dsc_commitment: Field,
+    pub secret_binding: Field,
 }
 
 pub struct SodDigests {
@@ -51,16 +55,22 @@ pub fn link<let EC: u32, let SA: u32>(
     SodDigests { econtent_hash, signed_attrs_hash: sha256_bounded(signed_attrs, signed_attrs_len) }
 }
 
+/// Publishes the secret as a domain scoped binding rather than directly, so
+/// a nullifier circuit can prove it holds the same document without the
+/// secret ever becoming public.
 pub fn outputs<let K: u32>(
     econtent_hash: [u8; 32],
     pubkey_x: [u8; K],
     pubkey_y: [u8; K],
+    signature_r: [u8; K],
+    signature_s: [u8; K],
     dsc_salt: Field,
     domain: Field,
 ) -> SodOutput {
     SodOutput {
         econtent_binding: econtent_binding(hash32_to_fields(econtent_hash), domain),
         dsc_commitment: dsc_commitment(pubkey_hash(pubkey_x, pubkey_y), dsc_salt),
+        secret_binding: secret_binding(document_secret(signature_r, signature_s), domain),
     }
 }
 
@@ -110,6 +120,8 @@ fn outputs_change_with_the_domain() {
         digests.econtent_hash,
         testdata::TD1_DSC_PUBKEY_X,
         testdata::TD1_DSC_PUBKEY_Y,
+        testdata::TD1_SIGNATURE_R,
+        testdata::TD1_SIGNATURE_S,
         7,
         1,
     );
@@ -118,6 +130,8 @@ fn outputs_change_with_the_domain() {
         digests.econtent_hash,
         testdata::TD1_DSC_PUBKEY_X,
         testdata::TD1_DSC_PUBKEY_Y,
+        testdata::TD1_SIGNATURE_R,
+        testdata::TD1_SIGNATURE_S,
         7,
         2,
     );
@@ -125,4 +139,34 @@ fn outputs_change_with_the_domain() {
     assert(a.econtent_binding != b.econtent_binding);
 
     assert(a.dsc_commitment == b.dsc_commitment);
+
+    assert(
+        a.secret_binding != b.secret_binding,
+        "the secret binding must differ between applications",
+    );
+}
+
+#[test]
+fn the_secret_binding_separates_documents() {
+    let td3 = outputs(
+        [0; 32],
+        testdata::TD3_DSC_PUBKEY_X,
+        testdata::TD3_DSC_PUBKEY_Y,
+        testdata::TD3_SIGNATURE_R,
+        testdata::TD3_SIGNATURE_S,
+        0,
+        1,
+    );
+
+    let td1 = outputs(
+        [0; 32],
+        testdata::TD1_DSC_PUBKEY_X,
+        testdata::TD1_DSC_PUBKEY_Y,
+        testdata::TD1_SIGNATURE_R,
+        testdata::TD1_SIGNATURE_S,
+        0,
+        1,
+    );
+
+    assert(td3.secret_binding != td1.secret_binding);
 }
