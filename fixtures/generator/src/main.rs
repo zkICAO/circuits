@@ -68,7 +68,7 @@ fn main() {
         }
     }
 
-    emit_rsa(&mut body, &work_dir);
+    emit_rsa_document(&mut body, &work_dir);
 
     std::fs::write(&out_path, body).expect("cannot write the fixture library");
 
@@ -283,32 +283,80 @@ fn emit_prover_toml(document: &Document, key: &ec::KeyPair) {
     println!("wrote {}", path.display());
 }
 
-/// An RSA signature over a known message, so the RSA path can be exercised
-/// against real key material rather than only against a hand built encoding.
-fn emit_rsa(body: &mut String, work_dir: &Path) {
+/// A complete document signed with RSA, which is what most states use. The
+/// same structures as the elliptic curve documents, so the only thing that
+/// differs downstream is the signature check.
+fn emit_rsa_document(body: &mut String, work_dir: &Path) {
     let key = rsa::generate(&work_dir.join("dsc-rsa.pem"));
 
-    let message = b"zkICAO rsa fixture message";
+    let dg1 = icao::build_dg1(icao::MRZ_TD3);
 
-    let signature = rsa::sign_sha256(&key, message);
+    let groups = vec![
+        icao::DataGroup {
+            number: 1,
+            content: dg1.clone(),
+        },
+        icao::DataGroup {
+            number: 2,
+            content: vec![0x5a; 96],
+        },
+    ];
 
-    let digest = ec::sha256(message);
+    let security_object = icao::build_security_object(&groups);
+
+    let signed_attrs = icao::build_signed_attributes(&security_object.econtent);
+
+    let signature = rsa::sign_sha256(&key, &signed_attrs.bytes);
 
     writeln!(
         body,
-        "// RSA-2048 PKCS#1 v1.5 signature over a known message, with the"
+        "// TD3 document signed with an RSA-2048 Document Signer key, with the"
     )
     .unwrap();
 
-    writeln!(body, "// Barrett reduction parameter the backend needs.").unwrap();
+    writeln!(
+        body,
+        "// Barrett reduction parameter the bignum backend takes alongside a modulus."
+    )
+    .unwrap();
+
+    emit_bytes(body, "RSA_DG1", &dg1, DG1_BUFFER);
+
+    emit_u32(body, "RSA_DG1_LEN", dg1.len());
+
+    emit_bytes(
+        body,
+        "RSA_ECONTENT",
+        &security_object.econtent,
+        ECONTENT_BUFFER,
+    );
+
+    emit_u32(body, "RSA_ECONTENT_LEN", security_object.econtent.len());
+
+    emit_u32(body, "RSA_OID_OFFSET", security_object.oid_offset);
+
+    for (number, offset) in &security_object.dg_offsets {
+        emit_u32(body, &format!("RSA_DG{number}_OFFSET"), *offset);
+    }
+
+    emit_bytes(
+        body,
+        "RSA_SIGNED_ATTRS",
+        &signed_attrs.bytes,
+        SIGNED_ATTRS_BUFFER,
+    );
+
+    emit_u32(body, "RSA_SIGNED_ATTRS_LEN", signed_attrs.bytes.len());
+
+    emit_u32(body, "RSA_DIGEST_OFFSET", signed_attrs.digest_offset);
+
+    emit_bytes(body, "RSA_DIGEST", &ec::sha256(&signed_attrs.bytes), 32);
 
     emit_limbs(body, "RSA_MODULUS_LIMBS", &key.modulus_limbs());
 
     emit_limbs(body, "RSA_REDC_LIMBS", &key.redc_limbs());
 
     emit_limbs(body, "RSA_SIGNATURE_LIMBS", &signature);
-
-    emit_bytes(body, "RSA_DIGEST", &digest, 32);
 }
 
 fn emit_limbs(body: &mut String, name: &str, value: &[u128]) {

@@ -18,6 +18,7 @@ members = [
     "lib/anchor",
     "lib/testdata",
     "bin/sod/ecdsa_p256_sha256_ec512",
+    "bin/sod/rsa2048_v15_sha256_ec512",
     "bin/dg_extract/sha256_ec512",
     "bin/attributes/mrz_td3_sha256",
     "bin/attributes/mrz_td1_sha256",

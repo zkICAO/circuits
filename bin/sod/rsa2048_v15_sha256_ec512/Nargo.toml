@@ -1,0 +1,12 @@
+[package]
+name = "sod_rsa2048_v15_sha256_ec512"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+hash = { path = "../../../lib/hash" }
+commit = { path = "../../../lib/commit" }
+rsa = { path = "../../../lib/rsa" }
+sod = { path = "../../../lib/sod" }
+testdata = { path = "../../../lib/testdata" }
