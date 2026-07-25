@@ -4,43 +4,71 @@ Noir circuits for privacy preserving verification of electronic identity documen
 
 The first target is ICAO Doc 9303 (Machine Readable Travel Documents): ePassports and national eID cards that carry a contactless chip. Other ICAO specifications are out of scope for now and will be considered on their own merits rather than assumed to fit.
 
-Status: early development. Only the shared libraries exist so far. No circuit implements the protocol yet, nothing has been proved end to end, and every name, layout and binding format below can still change.
+Status: early development. The chain below runs end to end against generated documents, and a proof over one of them verifies. Names, layouts and binding formats can still change, and the coverage gaps at the bottom of this page are real.
 
-## Intended design
-
-Small composable circuits linked by shared public values, rather than one monolithic prover, so that a verifier checks each proof and a fixed set of equalities between their public values.
+## The chain
 
 ```
-anchor/dsc-inclusion | anchor/csca-chain   (optional) DSC trust, up to the CSCA
-sod                                        document signer signature over the Security Object
-  dg-extract                               a data group hash committed by that Security Object
-    attributes/<profile>                   parse one data group, commit its fields
+anchor/dsc-inclusion | anchor/csca-chain   (optional) is the signer one we trust
+sod                                        did the signer sign this document
+  dg-extract                               which data group hash did it commit to
+    attributes/<profile>                   parse that data group, commit its fields
       predicate/compare                    numeric checks (age, expiry, ranges)
       predicate/member                     set membership (nationality, issuing state)
       predicate/reveal                     disclose a single field
       nullifier                            scoped uniqueness, versioned policies
-credential                                 (optional, on chain) recursive aggregation
 ```
 
-Doc 9303 makes DG1 (the machine readable zone) mandatory on every compliant document, so profiles that read DG1 are what keep the core portable across issuing states. Data groups defined by an individual state, such as DG13, are opt-in enrichment on top.
+Proofs are linked by equalities between their public values, not by trust in any one of them. The off-chain verifier in [zkICAO/prover](https://github.com/zkICAO/prover) enforces that checklist so an integration does not carry its own copy.
 
-Binding values, leaf formats and salt conventions are specified in [zkICAO/docs](https://github.com/zkICAO/docs) and implemented here once, in `lib/commit`; no circuit re-derives them. Circuits are intended to carry two scoping public inputs, `domain` (per application identity scoping) and `context` (per session freshness), once they exist.
+Doc 9303 makes DG1 (the machine readable zone) mandatory on every compliant document, so profiles that read DG1 are what keep the core portable across issuing states. Data groups an individual state defines, such as DG13, are opt-in enrichment and are not implemented.
+
+## Circuits
+
+Measured with `nargo info`, ACIR opcodes:
+
+| Circuit | Opcodes | What it proves |
+|---|---:|---|
+| `sod/ecdsa_p256_sha256_ec512` | 35096 | the signer signed the Security Object, ECDSA over P-256 |
+| `sod/rsa2048_v15_sha256_ec512` | 8719 | the same, RSA-2048 with PKCS#1 v1.5 |
+| `anchor/csca_chain_rsa2048_sha256_tbs512` | 6807 | a country signing key certified the signer, checked in circuit |
+| `dg_extract/sha256_ec512` | 3299 | a data group hash the Security Object commits to |
+| `attributes/mrz_td1_sha256` | 2447 | the fields of a card machine readable zone |
+| `attributes/mrz_td3_sha256` | 2101 | the fields of a passport machine readable zone |
+| `anchor/dsc_inclusion` | 340 | the signer key is in a published set |
+| `predicate/member` | 228 | a field is one of a published set |
+| `predicate/compare` | 121 | a field is within a range |
+| `predicate/reveal` | 98 | a field, disclosed verbatim |
+| `nullifier/document_number` | 56 | scoped uniqueness for one document |
+
+The Security Object signature dominates and runs once. Everything a verifier actually asks about costs two or three orders of magnitude less, which is why the signature check and the data group extraction are separate circuits rather than one.
+
+RSA is cheaper than the elliptic curve here, which is worth stating because it inverts the usual expectation: verifying RSA with a small exponent is seventeen modular multiplications, while an ECDSA verification is two scalar multiplications over a curve whose field is not the proving field, so it pays for non native arithmetic throughout.
 
 ## Layout
 
 ```
-lib/tlv         DER tag and definite length decoding
-lib/lds         Security Object helpers: hash algorithm identifier, data group entries
-lib/hash        message digests
-lib/mrz         TD1 and TD3 field offsets, check digits, two digit year resolution
-lib/normalize   raw field bytes into canonical values
-lib/commit      binding values, leaf format, Merkle tree, salt conventions
-lib/policy      nullifier policy identifiers
-lib/sig         signature verification wrappers
+lib/            shared libraries, where the logic lives
+bin/<name>/<variant>/   one package per compiled variant, a thin instantiation
+fixtures/generator/     builds the synthetic documents the tests run against
 probe/          build canary that imports every pinned dependency
 ```
 
-Doc 9303 also defines the TD2 layout, which `lib/mrz` does not implement yet.
+Variants differ by signature algorithm, digest algorithm and buffer size. A circuit pays for its buffer, not for the actual document length, which is why sizes are variants rather than one large buffer.
+
+## Fixtures
+
+`fixtures/generator` builds complete Doc 9303 material: DG1 wrapping a specimen machine readable zone, a Security Object over DG1 and DG2, CMS signed attributes, an ECDSA or RSA signature, and a Document Signer certificate signed by a country signing key. It has no external crates: DER is emitted directly, openssl handles key generation and signing, and a small big integer implementation computes the Barrett reduction parameter the bignum backend takes.
+
+Regenerating produces fresh keys, so the committed output in `lib/testdata` is the fixture of record.
+
+## Not implemented
+
+- Chip authentication of any kind, so a cloned chip carrying genuine data is not detected
+- TD2, which Doc 9303 defines alongside TD1 and TD3
+- Digest algorithms other than SHA-256, and signature algorithms beyond the variants listed above
+- Recursive aggregation, which on-chain verification would need
+- Nullifier policies that survive document reissue, which need a secret that is not chip bound
 
 ## Toolchain
 
