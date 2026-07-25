@@ -1,0 +1,9 @@
+[package]
+name = "anchor_dsc_inclusion"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+anchor = { path = "../../../lib/anchor" }
+commit = { path = "../../../lib/commit" }

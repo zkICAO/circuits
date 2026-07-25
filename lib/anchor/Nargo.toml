@@ -1,0 +1,8 @@
+[package]
+name = "anchor"
+type = "lib"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../commit" }

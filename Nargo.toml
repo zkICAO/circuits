@@ -14,6 +14,7 @@ members = [
     "lib/attributes",
     "lib/predicate",
     "lib/nullifier",
+    "lib/anchor",
     "lib/testdata",
     "bin/sod/ecdsa_p256_sha256_ec512",
     "bin/dg_extract/sha256_ec512",
@@ -23,5 +24,6 @@ members = [
     "bin/predicate/member",
     "bin/predicate/reveal",
     "bin/nullifier/document_number",
+    "bin/anchor/dsc_inclusion",
     "probe",
 ]
