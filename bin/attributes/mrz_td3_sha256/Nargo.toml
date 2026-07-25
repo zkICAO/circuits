@@ -5,7 +5,7 @@ authors = []
 compiler_version = ">=1.0.0"
 
 [dependencies]
-attributes = { path = "../../../lib/attributes" }
-commit = { path = "../../../lib/commit" }
-hash = { path = "../../../lib/hash" }
+attributes = { path = "../../../lib/emrtd/attributes" }
+commit = { path = "../../../lib/core/commit" }
+hash = { path = "../../../lib/core/hash" }
 testdata = { path = "../../../lib/testdata" }

@@ -1,0 +1,12 @@
+[package]
+name = "anchor"
+type = "lib"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../../core/commit" }
+hash = { path = "../../core/hash" }
+rsa = { path = "../../core/rsa" }
+x509 = { path = "../../core/x509" }
+testdata = { path = "../../testdata" }

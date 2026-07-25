@@ -5,6 +5,6 @@ authors = []
 compiler_version = ">=1.0.0"
 
 [dependencies]
-anchor = { path = "../../../lib/anchor" }
-commit = { path = "../../../lib/commit" }
+anchor = { path = "../../../lib/trust/anchor" }
+commit = { path = "../../../lib/core/commit" }
 testdata = { path = "../../../lib/testdata" }

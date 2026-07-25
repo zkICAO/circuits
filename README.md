@@ -51,13 +51,37 @@ RSA is cheaper than the elliptic curve here, which is worth stating because it i
 ## Layout
 
 ```
-lib/            shared libraries, where the logic lives
-bin/<name>/<variant>/   one package per compiled variant, a thin instantiation
-fixtures/generator/     builds the synthetic documents the tests run against
-tools/          execution only helpers, never proved
+lib/core/     commit hash sig rsa x509 normalize policy   no ICAO knowledge
+lib/emrtd/    cms lds sod dg_extract mrz attributes       Doc 9303 chip documents
+lib/trust/    anchor                                       the ICAO certificate chain
+lib/claims/   predicate nullifier                          statements about a commitment
+lib/testdata/                                              generated fixtures
+
+bin/<phase>/<instantiation>/    one package per compiled circuit
+tools/                          executed to solve a witness, never proved
+fixtures/generator/             builds the documents the tests run against
 ```
 
-Variants differ by signature algorithm, digest algorithm and buffer size. A circuit pays for its buffer, not for the actual document length, which is why sizes are variants rather than one large buffer.
+The project is named for ICAO rather than for one of its documents, and the grouping is where that shows. Doc 9303 is the first standard implemented and `lib/emrtd` is the part specific to it. A second ICAO credential family, a visible digital seal for instance, would add a sibling of `emrtd` and reuse `core`, `trust` and `claims` unchanged: a commitment, a certificate chain and a predicate do not care which document they came from.
+
+## Naming
+
+A circuit is `bin/<phase>/<instantiation>`, and its package is `<phase>_<instantiation>`, which is also the name the verifier knows it by.
+
+`<phase>` is the mechanism in the standard. `<instantiation>` is whatever makes two builds of that phase different, and that axis is not the same for every phase, because what varies is not the same:
+
+| phase | what differs | example |
+|---|---|---|
+| `sod` | signature, digest, buffer | `ecdsa_p256_sha256_ec512` |
+| `dg_extract` | digest, buffer | `sha256_ec512` |
+| `attributes` | profile, digest | `mrz_td3_sha256` |
+| `anchor` | mode, then algorithm | `dsc_inclusion`, `csca_chain_rsa2048_sha256_tbs512` |
+| `predicate` | the statement | `compare` |
+| `nullifier` | the policy | `document_number` |
+
+Underscores rather than hyphens throughout: Nargo rejects a package name containing a hyphen.
+
+A circuit pays for its buffer, not for the actual document length, which is why sizes are instantiations rather than one large buffer.
 
 ## Choosing a buffer
 

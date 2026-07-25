@@ -1,0 +1,11 @@
+[package]
+name = "sod"
+type = "lib"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+cms = { path = "../../emrtd/cms" }
+commit = { path = "../../core/commit" }
+hash = { path = "../../core/hash" }
+testdata = { path = "../../testdata" }

@@ -5,5 +5,5 @@ authors = []
 compiler_version = ">=1.0.0"
 
 [dependencies]
-commit = { path = "../../../lib/commit" }
-predicate = { path = "../../../lib/predicate" }
+commit = { path = "../../../lib/core/commit" }
+predicate = { path = "../../../lib/claims/predicate" }

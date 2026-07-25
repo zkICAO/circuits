@@ -1,0 +1,13 @@
+[package]
+name = "attributes"
+type = "lib"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../../core/commit" }
+hash = { path = "../../core/hash" }
+mrz = { path = "../../emrtd/mrz" }
+predicate = { path = "../../claims/predicate" }
+normalize = { path = "../../core/normalize" }
+testdata = { path = "../../testdata" }

@@ -5,4 +5,4 @@ authors = []
 compiler_version = ">=1.0.0"
 
 [dependencies]
-commit = { path = "../../lib/commit" }
+commit = { path = "../../lib/core/commit" }
