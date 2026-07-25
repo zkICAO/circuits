@@ -1,0 +1,10 @@
+[package]
+name = "anchor_csca_chain_rsa2048_sha256_tbs512"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+anchor = { path = "../../../lib/anchor" }
+commit = { path = "../../../lib/commit" }
+testdata = { path = "../../../lib/testdata" }

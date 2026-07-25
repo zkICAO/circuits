@@ -10,6 +10,7 @@ members = [
     "lib/policy",
     "lib/sig",
     "lib/rsa",
+    "lib/x509",
     "lib/sod",
     "lib/dg_extract",
     "lib/attributes",
@@ -27,5 +28,6 @@ members = [
     "bin/predicate/reveal",
     "bin/nullifier/document_number",
     "bin/anchor/dsc_inclusion",
+    "bin/anchor/csca_chain_rsa2048_sha256_tbs512",
     "probe",
 ]

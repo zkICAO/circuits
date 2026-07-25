@@ -1,0 +1,7 @@
+[package]
+name = "x509"
+type = "lib"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]

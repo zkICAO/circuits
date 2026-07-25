@@ -6,3 +6,7 @@ compiler_version = ">=1.0.0"
 
 [dependencies]
 commit = { path = "../commit" }
+hash = { path = "../hash" }
+rsa = { path = "../rsa" }
+x509 = { path = "../x509" }
+testdata = { path = "../testdata" }

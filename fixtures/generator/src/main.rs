@@ -8,6 +8,7 @@
 //! the committed output is the fixture of record.
 
 mod bigint;
+mod cert;
 mod der;
 mod ec;
 mod icao;
@@ -21,6 +22,8 @@ const ECONTENT_BUFFER: usize = 512;
 const SIGNED_ATTRS_BUFFER: usize = 256;
 
 const DG1_BUFFER: usize = 128;
+
+const CERTIFICATE_BUFFER: usize = 512;
 
 struct Document {
     prefix: &'static str,
@@ -69,6 +72,8 @@ fn main() {
     }
 
     emit_rsa_document(&mut body, &work_dir);
+
+    emit_certificate_chain(&mut body, &work_dir);
 
     std::fs::write(&out_path, body).expect("cannot write the fixture library");
 
@@ -357,6 +362,57 @@ fn emit_rsa_document(body: &mut String, work_dir: &Path) {
     emit_limbs(body, "RSA_REDC_LIMBS", &key.redc_limbs());
 
     emit_limbs(body, "RSA_SIGNATURE_LIMBS", &signature);
+}
+
+/// A country signing key over a Document Signer certificate, which is the
+/// link a trust chain has to check.
+fn emit_certificate_chain(body: &mut String, work_dir: &Path) {
+    let signer = ec::generate(&ec::P256, &work_dir.join("chain-dsc.pem"));
+
+    let authority = rsa::generate(&work_dir.join("chain-csca.pem"));
+
+    let certificate = cert::build_dsc_tbs(
+        &signer.public_x,
+        &signer.public_y,
+        "170101000000Z",
+        "301231235959Z",
+    );
+
+    let signature = rsa::sign_sha256(&authority, &certificate.tbs);
+
+    writeln!(
+        body,
+        "// A Document Signer certificate signed by an RSA-2048 country signing key."
+    )
+    .unwrap();
+
+    emit_bytes(body, "CHAIN_TBS", &certificate.tbs, CERTIFICATE_BUFFER);
+
+    emit_u32(body, "CHAIN_TBS_LEN", certificate.tbs.len());
+
+    emit_u32(
+        body,
+        "CHAIN_PUBLIC_KEY_OFFSET",
+        certificate.public_key_offset,
+    );
+
+    emit_u32(
+        body,
+        "CHAIN_NOT_BEFORE_OFFSET",
+        certificate.not_before_offset,
+    );
+
+    emit_u32(body, "CHAIN_NOT_AFTER_OFFSET", certificate.not_after_offset);
+
+    emit_bytes(body, "CHAIN_DSC_PUBKEY_X", &signer.public_x, 32);
+
+    emit_bytes(body, "CHAIN_DSC_PUBKEY_Y", &signer.public_y, 32);
+
+    emit_limbs(body, "CHAIN_CSCA_MODULUS_LIMBS", &authority.modulus_limbs());
+
+    emit_limbs(body, "CHAIN_CSCA_REDC_LIMBS", &authority.redc_limbs());
+
+    emit_limbs(body, "CHAIN_CSCA_SIGNATURE_LIMBS", &signature);
 }
 
 fn emit_limbs(body: &mut String, name: &str, value: &[u128]) {

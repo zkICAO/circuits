@@ -105,6 +105,18 @@ pub fn pubkey_hash<let K: u32>(x: [u8; K], y: [u8; K]) -> Field {
     Poseidon2::hash([TAG_DSC_KEY, packed[0], packed[1], packed[2], packed[3]], 5)
 }
 
+/// A country signing key, hashed for a registry leaf. Modulus limbs are
+/// folded pairwise so the same helper serves any modulus width.
+pub fn modulus_hash<let N: u32>(limbs: [u128; N]) -> Field {
+    let mut accumulator: Field = TAG_DSC_KEY;
+
+    for i in 0..N {
+        accumulator = Poseidon2::hash([accumulator, limbs[i] as Field], 2);
+    }
+
+    accumulator
+}
+
 /// Material that identifies one document and that only a party who read its
 /// chip can produce. The signature over the Security Object serves: it is
 /// fixed at issuance, so a prover cannot choose it, and it is not printed on
