@@ -9,7 +9,7 @@
 //! statement about a convenient field and let the verifier believe it was
 //! about the field it asked for.
 
-use commit::{commitment, leaf, leaf_to_root16, set_entry, walk_path};
+use commit::{commitment, leaf, set_entry, walk_path};
 
 pub use commit::FieldOpening;
 
@@ -32,7 +32,7 @@ fn open(opening: FieldOpening, expected_commitment: Field, domain: Field) {
         opening.entropy,
     );
 
-    let root = leaf_to_root16(value, opening.field_id - 1, opening.siblings);
+    let root = walk_path(value, opening.field_id - 1, opening.siblings);
 
     assert(
         commitment(root, domain) == expected_commitment,

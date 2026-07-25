@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "lib/tlv",
     "lib/lds",
     "lib/cms",
     "lib/hash",
@@ -30,5 +29,4 @@ members = [
     "bin/anchor/dsc_inclusion",
     "bin/anchor/csca_chain_rsa2048_sha256_tbs512",
     "tools/mrz_opening",
-    "probe",
 ]

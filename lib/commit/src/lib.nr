@@ -267,26 +267,6 @@ pub fn walk_path<let D: u32>(leaf_value: Field, index: u32, siblings: [Field; D]
     current
 }
 
-pub fn leaf_to_root16(leaf_value: Field, index: u32, siblings: [Field; 4]) -> Field {
-    assert(index < 16, "commit: leaf index out of range");
-
-    let mut current = leaf_value;
-
-    for level in 0..4 {
-        let bit = (index >> (level as u32)) & 1;
-
-        let pair = if bit == 0 {
-            [current, siblings[level]]
-        } else {
-            [siblings[level], current]
-        };
-
-        current = Poseidon2::hash(pair, 2);
-    }
-
-    current
-}
-
 pub fn commitment(root: Field, domain: Field) -> Field {
     Poseidon2::hash([TAG_COMMITMENT, root, domain], 3)
 }
@@ -352,7 +332,7 @@ fn merkle_roundtrip_all_indices() {
         let siblings: [Field; 4] =
             [leaves[i ^ 1], l8[(i / 2) ^ 1], l4[(i / 4) ^ 1], l2[(i / 8) ^ 1]];
 
-        assert(leaf_to_root16(leaves[i], i, siblings) == root, "roundtrip mismatch");
+        assert(walk_path(leaves[i], i, siblings) == root, "roundtrip mismatch");
     }
 }
 

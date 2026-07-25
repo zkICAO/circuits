@@ -12,8 +12,6 @@
 
 use sha256::sha256_var;
 
-pub global SHA256_BYTES: u32 = 32;
-
 pub fn sha256_bounded<let N: u32>(msg: [u8; N], len: u32) -> [u8; 32] {
     assert(len <= N, "hash: length exceeds buffer");
 

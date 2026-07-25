@@ -351,3 +351,26 @@ fn accepts_filler_check_digit_for_overflowing_document_number() {
 
     assert(!check_digit_ok(doc, mrz[53], false));
 }
+
+// A holder born in 2010 is sixteen on 2026-07-25 and must fail an adult
+// check. The century of a two digit year is decided by the date supplied
+// alongside the document, so a prover who picks 2005 makes the same birth
+// date read as 1910 and the check passes.
+#[test]
+fn a_prover_chosen_date_moves_a_minor_past_an_adult_check() {
+    let born_2010 = "100101".as_bytes();
+
+    let adult_cutoff: u32 = 20080725;
+
+    let honest = birth_date_to_int(born_2010, 20260725);
+
+    assert(honest == 20100101, "honest reading");
+
+    assert(honest > adult_cutoff, "honestly read, the holder is a minor");
+
+    let chosen = birth_date_to_int(born_2010, 20050101);
+
+    assert(chosen == 19100101, "the century moved");
+
+    assert(chosen <= adult_cutoff, "and the minor now passes the adult check");
+}

@@ -29,17 +29,17 @@ Measured with `nargo info`, ACIR opcodes:
 
 | Circuit | Opcodes | What it proves |
 |---|---:|---|
-| `sod/ecdsa_p256_sha256_ec512` | 35096 | the signer signed the Security Object, ECDSA over P-256 |
-| `sod/rsa2048_v15_sha256_ec512` | 8719 | the same, RSA-2048 with PKCS#1 v1.5 |
-| `anchor/csca_chain_rsa2048_sha256_tbs512` | 6807 | a country signing key certified the signer, checked in circuit |
-| `dg_extract/sha256_ec512` | 3299 | a data group hash the Security Object commits to |
-| `attributes/mrz_td1_sha256` | 2447 | the fields of a card machine readable zone |
-| `attributes/mrz_td3_sha256` | 2101 | the fields of a passport machine readable zone |
+| `sod/ecdsa_p256_sha256_ec512` | 35098 | the signer signed the Security Object, ECDSA over P-256 |
+| `sod/rsa2048_v15_sha256_ec512` | 8100 | the same, RSA-2048 with PKCS#1 v1.5 |
+| `anchor/csca_chain_rsa2048_sha256_tbs512` | 6841 | a country signing key certified the signer, checked in circuit |
+| `dg_extract/sha256_ec512` | 3301 | a data group hash the Security Object commits to |
+| `attributes/mrz_td1_sha256` | 2449 | the fields of a card machine readable zone |
+| `attributes/mrz_td3_sha256` | 2103 | the fields of a passport machine readable zone |
 | `anchor/dsc_inclusion` | 340 | the signer key is in a published set |
-| `predicate/member` | 228 | a field is one of a published set |
-| `predicate/compare` | 121 | a field is within a range |
-| `predicate/reveal` | 98 | a field, disclosed verbatim |
-| `nullifier/document_number` | 56 | scoped uniqueness for one document |
+| `predicate/member` | 230 | a field is one of a published set |
+| `predicate/compare` | 123 | a field is within a range |
+| `predicate/reveal` | 100 | a field, disclosed verbatim |
+| `nullifier/document_number` | 58 | scoped uniqueness for one document |
 
 The Security Object signature dominates and runs once. Everything a verifier actually asks about costs two or three orders of magnitude less, which is why the signature check and the data group extraction are separate circuits rather than one.
 
@@ -51,7 +51,7 @@ RSA is cheaper than the elliptic curve here, which is worth stating because it i
 lib/            shared libraries, where the logic lives
 bin/<name>/<variant>/   one package per compiled variant, a thin instantiation
 fixtures/generator/     builds the synthetic documents the tests run against
-probe/          build canary that imports every pinned dependency
+tools/          execution only helpers, never proved
 ```
 
 Variants differ by signature algorithm, digest algorithm and buffer size. A circuit pays for its buffer, not for the actual document length, which is why sizes are variants rather than one large buffer.
@@ -61,6 +61,12 @@ Variants differ by signature algorithm, digest algorithm and buffer size. A circ
 `fixtures/generator` builds complete Doc 9303 material: DG1 wrapping a specimen machine readable zone, a Security Object over DG1 and DG2, CMS signed attributes, an ECDSA or RSA signature, and a Document Signer certificate signed by a country signing key. It has no external crates: DER is emitted directly, openssl handles key generation and signing, and a small big integer implementation computes the Barrett reduction parameter the bignum backend takes.
 
 Regenerating produces fresh keys, so the committed output in `lib/testdata` is the fixture of record.
+
+## Verifying a bundle
+
+`cargo run -- bundle` in `fixtures/generator` signs a document, executes every circuit in chain order feeding each one's outputs into the next, and produces and verifies a proof for each. That is the check that the pieces fit; the unit tests exercise circuits in isolation.
+
+The off-chain verifier consumes the result. It returns what a bundle proved, not only that it verified, because the prover chooses the field, the range and the set, and a verifier that learns only "the checks passed" does not know its question was the one answered.
 
 ## Not implemented
 

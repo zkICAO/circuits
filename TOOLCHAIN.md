@@ -16,15 +16,14 @@ Pinned in the packages that use them. Tags below are the versions currently reso
 
 | Crate | Tag | Source | Used by |
 |---|---|---|---|
-| sha256 | v0.3.0 | noir-lang/sha256 | hash, probe |
-| poseidon | v0.2.6 | noir-lang/poseidon | commit, probe |
-| bignum | v0.9.2-1 | zkpassport/noir-bignum | sig, probe |
-| bigcurve | v0.13.2-1 | zkpassport/noir_bigcurve | sig, probe |
-| ecdsa | v0.3.0 | zkpassport/noir-ecdsa | sig, probe |
-| sha1 | v0.11 | zac-williamson/sha1 | probe |
+| sha256 | v0.3.0 | noir-lang/sha256 | hash |
+| poseidon | v0.2.6 | noir-lang/poseidon | commit |
+| bignum | v0.9.2-1 | zkpassport/noir-bignum | rsa, sig |
+| bigcurve | v0.13.2-1 | zkpassport/noir_bigcurve | sig |
+| ecdsa | v0.3.0 | zkpassport/noir-ecdsa | sig |
 
-RSA is not implemented. Documents whose Document Signer Certificate uses RSA are therefore not yet supported; adding that path is tracked work, and this table is the place to record the dependency it lands with.
+RSA PKCS#1 v1.5 is implemented in `lib/rsa` on the bignum modexp, with no dependency of its own. SHA-1 was pinned for an Active Authentication path that is not implemented; the dependency went when the build probe that was its only user did.
 
-## Probe
+## Checking the pin
 
-`probe/` is a minimal circuit that imports and exercises every dependency above. If `nargo compile` succeeds on the workspace, the dependency graph resolves and type checks under the pin. It is a build canary only: it verifies nothing about the protocol and is not part of any proving flow.
+The eleven circuits compile against every dependency above, so a clean `nargo compile` on the workspace is itself the check that the graph resolves under the pin. A separate build probe existed for this and was removed once the real circuits covered it.
