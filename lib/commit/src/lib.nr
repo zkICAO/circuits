@@ -38,6 +38,15 @@ pub global TAG_FIELD_ENTROPY: Field = 8;
 
 pub global TAG_DSC_KEY: Field = 9;
 
+pub global TAG_SET_ENTRY: Field = 10;
+
+/// An entry in a set the verifier publishes, such as a list of accepted
+/// issuing states. Tagged like everything else so a set entry cannot be
+/// mistaken for a document leaf.
+pub fn set_entry(data: [Field; 4]) -> Field {
+    Poseidon2::hash([TAG_SET_ENTRY, data[0], data[1], data[2], data[3]], 5)
+}
+
 pub fn hash32_to_fields(h: [u8; 32]) -> [Field; 2] {
     let mut hi: Field = 0;
 
@@ -123,6 +132,12 @@ pub fn leaf(field_id: Field, length: Field, data: [Field; 4], entropy: Field) ->
     )
 }
 
+/// A Merkle internal node. Deliberately untagged and two wide: every value
+/// with a role tag is wider, so a tagged value can never be read as a node.
+pub fn hash_pair(left: Field, right: Field) -> Field {
+    Poseidon2::hash([left, right], 2)
+}
+
 pub fn root16(leaves: [Field; 16]) -> Field {
     let mut l8: [Field; 8] = [0; 8];
 
@@ -143,6 +158,36 @@ pub fn root16(leaves: [Field; 16]) -> Field {
     }
 
     Poseidon2::hash([l2[0], l2[1]], 2)
+}
+
+/// Walks a Merkle path of any depth. The index supplies one direction bit
+/// per level, so a sibling can never be applied on the wrong side.
+pub fn walk_path<let D: u32>(leaf_value: Field, index: u32, siblings: [Field; D]) -> Field {
+    assert(D < 32, "commit: path depth out of range");
+
+    let mut capacity: u32 = 1;
+
+    for _ in 0..D {
+        capacity = capacity * 2;
+    }
+
+    assert(index < capacity, "commit: leaf index out of range");
+
+    let mut current = leaf_value;
+
+    for level in 0..D {
+        let bit = (index >> (level as u32)) & 1;
+
+        let pair = if bit == 0 {
+            [current, siblings[level]]
+        } else {
+            [siblings[level], current]
+        };
+
+        current = Poseidon2::hash(pair, 2);
+    }
+
+    current
 }
 
 pub fn leaf_to_root16(leaf_value: Field, index: u32, siblings: [Field; 4]) -> Field {
