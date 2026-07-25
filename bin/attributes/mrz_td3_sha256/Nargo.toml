@@ -1,0 +1,11 @@
+[package]
+name = "attributes_mrz_td3_sha256"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+attributes = { path = "../../../lib/attributes" }
+commit = { path = "../../../lib/commit" }
+hash = { path = "../../../lib/hash" }
+testdata = { path = "../../../lib/testdata" }

@@ -1,0 +1,10 @@
+[package]
+name = "nullifier_document_number"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../../../lib/commit" }
+nullifier = { path = "../../../lib/nullifier" }
+predicate = { path = "../../../lib/predicate" }

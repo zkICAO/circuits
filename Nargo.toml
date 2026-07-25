@@ -17,5 +17,11 @@ members = [
     "lib/testdata",
     "bin/sod/ecdsa_p256_sha256_ec512",
     "bin/dg_extract/sha256_ec512",
+    "bin/attributes/mrz_td3_sha256",
+    "bin/attributes/mrz_td1_sha256",
+    "bin/predicate/compare",
+    "bin/predicate/member",
+    "bin/predicate/reveal",
+    "bin/nullifier/document_number",
     "probe",
 ]
