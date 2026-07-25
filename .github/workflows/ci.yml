@@ -38,6 +38,13 @@ jobs:
       - name: Check the chain links
         run: cargo run --manifest-path fixtures/generator/Cargo.toml -- bundle --no-prove
 
+      # The verifier in the other repository reads a committed copy of this.
+      # Regenerating here catches a circuit signature the generator can no
+      # longer describe; that the committed copy matches is enforced by the
+      # verifier's own tests.
+      - name: Layout manifest generates
+        run: cargo run --manifest-path fixtures/generator/Cargo.toml -- manifest /tmp/layout.manifest
+
       - name: Generator tests
         run: cargo test --manifest-path fixtures/generator/Cargo.toml
 

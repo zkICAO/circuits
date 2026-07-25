@@ -13,6 +13,7 @@ mod cert;
 mod der;
 mod ec;
 mod icao;
+mod manifest;
 mod rsa;
 mod scratch;
 
@@ -34,8 +35,29 @@ struct Document {
 }
 
 fn main() {
-    // Two jobs: refresh the committed fixtures, or prove a document all the
-    // way through and check the result.
+    // Three jobs: refresh the committed fixtures, prove a document all the way
+    // through and check the result, or write the layout the verifier reads.
+    if std::env::args().nth(1).as_deref() == Some("manifest") {
+        let circuits_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("unexpected generator location");
+
+        let destination = std::env::args()
+            .nth(2)
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                circuits_root
+                    .parent()
+                    .expect("unexpected checkout layout")
+                    .join("prover/layout.manifest")
+            });
+
+        manifest::write(circuits_root, &destination);
+
+        return;
+    }
+
     if std::env::args().nth(1).as_deref() == Some("bundle") {
         let proving = std::env::args().nth(2).as_deref() != Some("--no-prove");
 

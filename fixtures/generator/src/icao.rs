@@ -255,7 +255,10 @@ mod sizing {
             "thirteen groups do not, so a document carrying them needs the larger variant"
         );
 
-        assert!(econtent_len(16, 32) > 512, "a full document certainly does not");
+        assert!(
+            econtent_len(16, 32) > 512,
+            "a full document certainly does not"
+        );
     }
 
     #[test]
