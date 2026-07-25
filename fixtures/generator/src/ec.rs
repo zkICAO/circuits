@@ -40,7 +40,7 @@ pub struct Signature {
     pub s: Vec<u8>,
 }
 
-fn run(program: &str, args: &[&str], stdin: Option<&[u8]>) -> Vec<u8> {
+pub fn run(program: &str, args: &[&str], stdin: Option<&[u8]>) -> Vec<u8> {
     let mut child = Command::new(program)
         .args(args)
         .stdin(if stdin.is_some() {

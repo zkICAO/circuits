@@ -1,0 +1,9 @@
+[package]
+name = "rsa"
+type = "lib"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+testdata = { path = "../testdata" }
+bignum = { tag = "v0.9.2-1", git = "https://github.com/zkpassport/noir-bignum" }

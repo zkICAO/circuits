@@ -7,9 +7,11 @@
 //! genuine document is involved, and regenerating produces a fresh key, so
 //! the committed output is the fixture of record.
 
+mod bigint;
 mod der;
 mod ec;
 mod icao;
+mod rsa;
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -65,6 +67,8 @@ fn main() {
             emit_prover_toml(document, &key);
         }
     }
+
+    emit_rsa(&mut body, &work_dir);
 
     std::fs::write(&out_path, body).expect("cannot write the fixture library");
 
@@ -277,6 +281,44 @@ fn emit_prover_toml(document: &Document, key: &ec::KeyPair) {
     std::fs::write(&path, toml).expect("cannot write the witness");
 
     println!("wrote {}", path.display());
+}
+
+/// An RSA signature over a known message, so the RSA path can be exercised
+/// against real key material rather than only against a hand built encoding.
+fn emit_rsa(body: &mut String, work_dir: &Path) {
+    let key = rsa::generate(&work_dir.join("dsc-rsa.pem"));
+
+    let message = b"zkICAO rsa fixture message";
+
+    let signature = rsa::sign_sha256(&key, message);
+
+    let digest = ec::sha256(message);
+
+    writeln!(
+        body,
+        "// RSA-2048 PKCS#1 v1.5 signature over a known message, with the"
+    )
+    .unwrap();
+
+    writeln!(body, "// Barrett reduction parameter the backend needs.").unwrap();
+
+    emit_limbs(body, "RSA_MODULUS_LIMBS", &key.modulus_limbs());
+
+    emit_limbs(body, "RSA_REDC_LIMBS", &key.redc_limbs());
+
+    emit_limbs(body, "RSA_SIGNATURE_LIMBS", &signature);
+
+    emit_bytes(body, "RSA_DIGEST", &digest, 32);
+}
+
+fn emit_limbs(body: &mut String, name: &str, value: &[u128]) {
+    write!(body, "pub global {name}: [u128; {}] = [", value.len()).unwrap();
+
+    for limb in value {
+        write!(body, "\n    {limb},").unwrap();
+    }
+
+    body.push_str("\n];\n\n");
 }
 
 fn toml_bytes(out: &mut String, name: &str, value: &[u8], width: usize) {

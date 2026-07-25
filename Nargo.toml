@@ -9,6 +9,7 @@ members = [
     "lib/commit",
     "lib/policy",
     "lib/sig",
+    "lib/rsa",
     "lib/sod",
     "lib/dg_extract",
     "lib/attributes",
