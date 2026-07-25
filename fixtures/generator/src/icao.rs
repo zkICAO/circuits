@@ -218,3 +218,48 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod sizing {
+    use super::*;
+
+    /// Builds a Security Object covering `count` data groups, which is what
+    /// decides how large a buffer a circuit needs.
+    fn econtent_len(count: u8, hash_len: usize) -> usize {
+        let groups: Vec<DataGroup> = (1..=count)
+            .map(|number| DataGroup {
+                number,
+                content: vec![number; 64],
+            })
+            .collect();
+
+        assert_eq!(hash_len, 32, "only SHA-256 entries are built today");
+
+        build_security_object(&groups).econtent.len()
+    }
+
+    // Doc 9303 allows sixteen data groups and requires two. The shipped
+    // buffer is 512 bytes, so the number of groups a document carries decides
+    // whether it can be proved at all.
+    #[test]
+    fn a_full_document_does_not_fit_the_512_byte_buffer() {
+        assert!(econtent_len(2, 32) < 512, "the synthetic fixture fits");
+
+        assert!(
+            econtent_len(12, 32) < 512,
+            "twelve groups still fit, which is why the shipped buffer is usable at all"
+        );
+
+        assert!(
+            econtent_len(13, 32) > 512,
+            "thirteen groups do not, so a document carrying them needs the larger variant"
+        );
+
+        assert!(econtent_len(16, 32) > 512, "a full document certainly does not");
+    }
+
+    #[test]
+    fn a_full_document_fits_1024() {
+        assert!(econtent_len(16, 32) < 1024);
+    }
+}

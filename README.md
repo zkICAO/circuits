@@ -29,10 +29,13 @@ Measured with `nargo info`, ACIR opcodes:
 
 | Circuit | Opcodes | What it proves |
 |---|---:|---|
-| `sod/ecdsa_p256_sha256_ec512` | 35098 | the signer signed the Security Object, ECDSA over P-256 |
-| `sod/rsa2048_v15_sha256_ec512` | 8100 | the same, RSA-2048 with PKCS#1 v1.5 |
+| `sod/ecdsa_p256_sha256_ec1024` | 38034 | the signer signed the Security Object, ECDSA over P-256 |
+| `sod/ecdsa_p256_sha256_ec512` | 35098 | the same, for a smaller Security Object |
+| `sod/rsa2048_v15_sha256_ec1024` | 11036 | the same, RSA-2048 with PKCS#1 v1.5 |
+| `sod/rsa2048_v15_sha256_ec512` | 8100 | the same, for a smaller Security Object |
 | `anchor/csca_chain_rsa2048_sha256_tbs512` | 6841 | a country signing key certified the signer, checked in circuit |
-| `dg_extract/sha256_ec512` | 3301 | a data group hash the Security Object commits to |
+| `dg_extract/sha256_ec1024` | 6237 | a data group hash the Security Object commits to |
+| `dg_extract/sha256_ec512` | 3301 | the same, for a smaller Security Object |
 | `attributes/mrz_td1_sha256` | 2449 | the fields of a card machine readable zone |
 | `attributes/mrz_td3_sha256` | 2103 | the fields of a passport machine readable zone |
 | `anchor/dsc_inclusion` | 340 | the signer key is in a published set |
@@ -55,6 +58,12 @@ tools/          execution only helpers, never proved
 ```
 
 Variants differ by signature algorithm, digest algorithm and buffer size. A circuit pays for its buffer, not for the actual document length, which is why sizes are variants rather than one large buffer.
+
+## Choosing a buffer
+
+A Security Object holds one entry per data group, 39 bytes each with SHA-256 hashes. Twelve data groups fit 512 bytes and thirteen do not, and Doc 9303 allows sixteen, so a document carrying more than twelve needs the 1024 byte variant. Larger digests move the line further: with SHA-512 entries only six fit 512 bytes.
+
+Doubling the buffer costs 2936 ACIR opcodes in every variant, which is the extra hashing and nothing else. Against the 35098 of an elliptic curve signature check that is eight percent; against a data group extraction it is most of the circuit.
 
 ## Fixtures
 
