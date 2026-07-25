@@ -108,14 +108,21 @@ pub fn pubkey_hash<let K: u32>(x: [u8; K], y: [u8; K]) -> Field {
 /// Folds a big number given as limbs, one limb at a time, so the same helper
 /// serves any width. Every limb enters, which is what makes the result an
 /// identifier for the whole number rather than for a sample of it.
+///
+/// The fold runs through two input hashes, which is the shape of a Merkle
+/// internal node, so the accumulator alone would break the rule that only
+/// nodes take that shape. The last step is three wide and carries both the
+/// role tag and the limb count, which restores it and at the same time keeps
+/// a narrow number from folding to the same value as a wider one whose
+/// leading limbs are zero.
 fn fold_limbs<let N: u32>(tag: Field, limbs: [u128; N]) -> Field {
-    let mut accumulator = tag;
+    let mut accumulator: Field = 0;
 
     for i in 0..N {
         accumulator = Poseidon2::hash([accumulator, limbs[i] as Field], 2);
     }
 
-    accumulator
+    Poseidon2::hash([tag, N as Field, accumulator], 3)
 }
 
 /// An RSA key, hashed the way `pubkey_hash` hashes a curve point.
@@ -405,4 +412,15 @@ fn a_key_and_a_secret_from_the_same_limbs_differ() {
     let mut limbs: [u128; 4] = [7, 8, 9, 10];
 
     assert(modulus_hash(limbs) != limbs_document_secret(limbs));
+}
+
+// A number is identified together with its width, so a narrower value cannot
+// fold to the same result as a wider one whose leading limbs are zero.
+#[test]
+fn folding_separates_widths() {
+    let short: [u128; 2] = [5, 6];
+
+    let padded: [u128; 3] = [5, 6, 0];
+
+    assert(modulus_hash(short) != modulus_hash(padded));
 }

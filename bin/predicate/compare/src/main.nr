@@ -19,6 +19,8 @@ fn main(
 ) {
     assert(context != 0, "predicate: context must be set");
 
+    assert(domain != 0, "predicate: domain must be set");
+
     predicate::compare(
         predicate::FieldOpening { field_id, length, data, entropy, siblings },
         commitment,

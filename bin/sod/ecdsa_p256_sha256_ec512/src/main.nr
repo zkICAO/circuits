@@ -26,6 +26,8 @@ fn main(
     // rather than leaving it an input the circuit never reads.
     assert(context != 0, "sod: context must be set");
 
+    assert(domain != 0, "sod: domain must be set");
+
     let digests = sod::link(
         econtent,
         econtent_len,
@@ -121,6 +123,24 @@ fn rejects_signed_attributes_from_another_document() {
         testdata::TD3_SIGNATURE_S,
         11,
         22,
+        33,
+    );
+}
+
+#[test(should_fail_with = "sod: domain must be set")]
+fn rejects_an_unset_domain() {
+    let _ = main(
+        testdata::TD3_ECONTENT,
+        testdata::TD3_ECONTENT_LEN,
+        testdata::TD3_SIGNED_ATTRS,
+        testdata::TD3_SIGNED_ATTRS_LEN,
+        testdata::TD3_DIGEST_OFFSET,
+        testdata::TD3_DSC_PUBKEY_X,
+        testdata::TD3_DSC_PUBKEY_Y,
+        testdata::TD3_SIGNATURE_R,
+        testdata::TD3_SIGNATURE_S,
+        11,
+        0,
         33,
     );
 }

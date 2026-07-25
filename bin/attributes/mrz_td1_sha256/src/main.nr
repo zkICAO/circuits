@@ -15,6 +15,8 @@ fn main(
 ) -> pub Field {
     assert(context != 0, "attributes: context must be set");
 
+    assert(domain != 0, "attributes: domain must be set");
+
     let out = attributes::td1(
         dg1,
         dg1_len,

@@ -23,6 +23,8 @@ fn main(
 ) -> pub Field {
     assert(context != 0, "nullifier: context must be set");
 
+    assert(domain != 0, "nullifier: domain must be set");
+
     nullifier::document_number(
         predicate::FieldOpening {
             field_id: 2,

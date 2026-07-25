@@ -26,6 +26,8 @@ fn main(
 ) -> pub (Field, Field, Field) {
     assert(context != 0, "sod: context must be set");
 
+    assert(domain != 0, "sod: domain must be set");
+
     let digests = sod::link(
         econtent,
         econtent_len,
