@@ -6,9 +6,10 @@
 //! differs, which is the point of keeping that step in the variant rather
 //! than in the shared library.
 //!
-//! The document secret is derived from the signature, and an RSA signature is
-//! a single number rather than a pair, so its limbs are split in half to fill
-//! the two slots the derivation takes.
+//! The key and the signature are single numbers here rather than pairs, so
+//! the commitment helpers that fold limbs are the right ones. Every limb
+//! enters, which matters: an earlier version sampled a few bytes per limb and
+//! so committed to 432 bits of a 2048 bit modulus.
 
 fn main(
     econtent: [u8; 512],
@@ -40,44 +41,15 @@ fn main(
         digests.signed_attrs_hash,
     );
 
-    let key_bytes = limbs_to_bytes(modulus_limbs);
-
-    let signature_bytes = limbs_to_bytes(signature_limbs);
-
     let out = sod::outputs(
         digests.econtent_hash,
-        key_bytes.0,
-        key_bytes.1,
-        signature_bytes.0,
-        signature_bytes.1,
+        commit::modulus_hash(modulus_limbs),
+        commit::limbs_document_secret(signature_limbs),
         dsc_salt,
         domain,
     );
 
     (out.econtent_binding, out.dsc_commitment, out.secret_binding)
-}
-
-/// Packs eighteen 120 bit limbs into two 32 byte halves, so a 2048 bit value
-/// reaches the commitment helpers in the shape they take for a curve point.
-/// Only the identity of the value matters here, not its numeric layout.
-fn limbs_to_bytes(limbs: [u128; 18]) -> ([u8; 32], [u8; 32]) {
-    let mut low: [u8; 32] = [0; 32];
-
-    let mut high: [u8; 32] = [0; 32];
-
-    for i in 0..9 {
-        let low_bytes: [u8; 16] = (limbs[i] as Field).to_be_bytes();
-
-        let high_bytes: [u8; 16] = (limbs[i + 9] as Field).to_be_bytes();
-
-        for j in 0..3 {
-            low[i * 3 + j] = low_bytes[13 + j];
-
-            high[i * 3 + j] = high_bytes[13 + j];
-        }
-    }
-
-    (low, high)
 }
 
 #[test]

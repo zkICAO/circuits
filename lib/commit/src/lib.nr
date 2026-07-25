@@ -105,16 +105,28 @@ pub fn pubkey_hash<let K: u32>(x: [u8; K], y: [u8; K]) -> Field {
     Poseidon2::hash([TAG_DSC_KEY, packed[0], packed[1], packed[2], packed[3]], 5)
 }
 
-/// A country signing key, hashed for a registry leaf. Modulus limbs are
-/// folded pairwise so the same helper serves any modulus width.
-pub fn modulus_hash<let N: u32>(limbs: [u128; N]) -> Field {
-    let mut accumulator: Field = TAG_DSC_KEY;
+/// Folds a big number given as limbs, one limb at a time, so the same helper
+/// serves any width. Every limb enters, which is what makes the result an
+/// identifier for the whole number rather than for a sample of it.
+fn fold_limbs<let N: u32>(tag: Field, limbs: [u128; N]) -> Field {
+    let mut accumulator = tag;
 
     for i in 0..N {
         accumulator = Poseidon2::hash([accumulator, limbs[i] as Field], 2);
     }
 
     accumulator
+}
+
+/// An RSA key, hashed the way `pubkey_hash` hashes a curve point.
+pub fn modulus_hash<let N: u32>(limbs: [u128; N]) -> Field {
+    fold_limbs(TAG_DSC_KEY, limbs)
+}
+
+/// The document secret for a signature given as limbs, the RSA counterpart
+/// of `document_secret`.
+pub fn limbs_document_secret<let N: u32>(limbs: [u128; N]) -> Field {
+    fold_limbs(TAG_DOCUMENT_SECRET, limbs)
 }
 
 /// Material that identifies one document and that only a party who read its
@@ -364,4 +376,33 @@ fn hash32_packs_big_endian() {
     assert(f[0] == 1);
 
     assert(f[1] == 2);
+}
+
+// Every limb has to reach the result. An earlier RSA path sampled three
+// bytes per limb, which committed to 432 bits of a 2048 bit modulus and so
+// did not identify the key it claimed to.
+#[test]
+fn folding_limbs_depends_on_every_limb() {
+    let mut limbs: [u128; 18] = [0; 18];
+
+    for i in 0..18 {
+        limbs[i] = (i as u128) + 1;
+    }
+
+    let baseline = modulus_hash(limbs);
+
+    for position in 0..18 {
+        let mut altered = limbs;
+
+        altered[position] = altered[position] + 1;
+
+        assert(modulus_hash(altered) != baseline, "a limb did not reach the hash");
+    }
+}
+
+#[test]
+fn a_key_and_a_secret_from_the_same_limbs_differ() {
+    let mut limbs: [u128; 4] = [7, 8, 9, 10];
+
+    assert(modulus_hash(limbs) != limbs_document_secret(limbs));
 }

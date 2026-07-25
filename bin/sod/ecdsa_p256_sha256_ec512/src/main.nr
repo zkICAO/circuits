@@ -44,10 +44,8 @@ fn main(
 
     let out = sod::outputs(
         digests.econtent_hash,
-        pubkey_x,
-        pubkey_y,
-        signature_r,
-        signature_s,
+        commit::pubkey_hash(pubkey_x, pubkey_y),
+        commit::document_secret(signature_r, signature_s),
         dsc_salt,
         domain,
     );

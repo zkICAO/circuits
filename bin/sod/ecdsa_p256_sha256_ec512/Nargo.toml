@@ -5,6 +5,7 @@ authors = []
 compiler_version = ">=1.0.0"
 
 [dependencies]
+commit = { path = "../../../lib/commit" }
 sig = { path = "../../../lib/sig" }
 sod = { path = "../../../lib/sod" }
 testdata = { path = "../../../lib/testdata" }

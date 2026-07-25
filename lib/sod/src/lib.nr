@@ -15,10 +15,7 @@
 //! own algorithm: `link` returns the digest the signature must cover, and
 //! `outputs` derives the public values once that signature has verified.
 
-use commit::{
-    document_secret, dsc_commitment, econtent_binding, hash32_to_fields, pubkey_hash,
-    secret_binding,
-};
+use commit::{dsc_commitment, econtent_binding, hash32_to_fields, secret_binding};
 
 use hash::sha256_bounded;
 
@@ -58,19 +55,24 @@ pub fn link<let EC: u32, let SA: u32>(
 /// Publishes the secret as a domain scoped binding rather than directly, so
 /// a nullifier circuit can prove it holds the same document without the
 /// secret ever becoming public.
-pub fn outputs<let K: u32>(
+///
+/// The key and signature arrive already hashed. Their representation differs
+/// by algorithm, a curve point against a modulus and its signature, and each
+/// has a helper in `commit` that folds all of it. Taking the hashes here
+/// rather than the raw values keeps that choice with the variant that knows
+/// the algorithm, and leaves no room for one to pass a value in a shape that
+/// silently drops part of it.
+pub fn outputs(
     econtent_hash: [u8; 32],
-    pubkey_x: [u8; K],
-    pubkey_y: [u8; K],
-    signature_r: [u8; K],
-    signature_s: [u8; K],
+    dsc_pubkey_hash: Field,
+    document_secret: Field,
     dsc_salt: Field,
     domain: Field,
 ) -> SodOutput {
     SodOutput {
         econtent_binding: econtent_binding(hash32_to_fields(econtent_hash), domain),
-        dsc_commitment: dsc_commitment(pubkey_hash(pubkey_x, pubkey_y), dsc_salt),
-        secret_binding: secret_binding(document_secret(signature_r, signature_s), domain),
+        dsc_commitment: dsc_commitment(dsc_pubkey_hash, dsc_salt),
+        secret_binding: secret_binding(document_secret, domain),
     }
 }
 
@@ -116,25 +118,13 @@ fn outputs_change_with_the_domain() {
         testdata::TD1_DIGEST_OFFSET,
     );
 
-    let a = outputs(
-        digests.econtent_hash,
-        testdata::TD1_DSC_PUBKEY_X,
-        testdata::TD1_DSC_PUBKEY_Y,
-        testdata::TD1_SIGNATURE_R,
-        testdata::TD1_SIGNATURE_S,
-        7,
-        1,
-    );
+    let key = commit::pubkey_hash(testdata::TD1_DSC_PUBKEY_X, testdata::TD1_DSC_PUBKEY_Y);
 
-    let b = outputs(
-        digests.econtent_hash,
-        testdata::TD1_DSC_PUBKEY_X,
-        testdata::TD1_DSC_PUBKEY_Y,
-        testdata::TD1_SIGNATURE_R,
-        testdata::TD1_SIGNATURE_S,
-        7,
-        2,
-    );
+    let secret = commit::document_secret(testdata::TD1_SIGNATURE_R, testdata::TD1_SIGNATURE_S);
+
+    let a = outputs(digests.econtent_hash, key, secret, 7, 1);
+
+    let b = outputs(digests.econtent_hash, key, secret, 7, 2);
 
     assert(a.econtent_binding != b.econtent_binding);
 
@@ -150,20 +140,16 @@ fn outputs_change_with_the_domain() {
 fn the_secret_binding_separates_documents() {
     let td3 = outputs(
         [0; 32],
-        testdata::TD3_DSC_PUBKEY_X,
-        testdata::TD3_DSC_PUBKEY_Y,
-        testdata::TD3_SIGNATURE_R,
-        testdata::TD3_SIGNATURE_S,
+        commit::pubkey_hash(testdata::TD3_DSC_PUBKEY_X, testdata::TD3_DSC_PUBKEY_Y),
+        commit::document_secret(testdata::TD3_SIGNATURE_R, testdata::TD3_SIGNATURE_S),
         0,
         1,
     );
 
     let td1 = outputs(
         [0; 32],
-        testdata::TD1_DSC_PUBKEY_X,
-        testdata::TD1_DSC_PUBKEY_Y,
-        testdata::TD1_SIGNATURE_R,
-        testdata::TD1_SIGNATURE_S,
+        commit::pubkey_hash(testdata::TD1_DSC_PUBKEY_X, testdata::TD1_DSC_PUBKEY_Y),
+        commit::document_secret(testdata::TD1_SIGNATURE_R, testdata::TD1_SIGNATURE_S),
         0,
         1,
     );
