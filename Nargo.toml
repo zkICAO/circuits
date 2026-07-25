@@ -10,7 +10,9 @@ members = [
     "lib/policy",
     "lib/sig",
     "lib/sod",
+    "lib/dg_extract",
     "lib/testdata",
     "bin/sod/ecdsa_p256_sha256_ec512",
+    "bin/dg_extract/sha256_ec512",
     "probe",
 ]

@@ -1,0 +1,11 @@
+[package]
+name = "dg_extract_sha256_ec512"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../../../lib/commit" }
+dg_extract = { path = "../../../lib/dg_extract" }
+hash = { path = "../../../lib/hash" }
+testdata = { path = "../../../lib/testdata" }
