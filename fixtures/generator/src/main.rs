@@ -77,6 +77,24 @@ fn main() {
             .and_then(|p| p.parent())
             .expect("unexpected generator location");
 
+        // The check form recomputes and compares instead of writing, so a
+        // circuit changed without regenerating fails here rather than as a
+        // proof that will not verify.
+        if std::env::args().nth(2).as_deref() == Some("--check") {
+            if keys::check(circuits_root) {
+                println!("every recursive circuit pins the hashes its inner circuits have now");
+            } else {
+                eprintln!(
+                    "a recursive circuit pins a stale verification key hash; \
+                     run `cargo run -- keys` and commit the result"
+                );
+
+                std::process::exit(1);
+            }
+
+            return;
+        }
+
         keys::write(circuits_root);
 
         return;

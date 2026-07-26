@@ -51,8 +51,30 @@ const HEADER: &str = "\
 
 ";
 
+/// Writes the key hash files.
 pub fn write(circuits_root: &Path) {
+    emit(circuits_root, Mode::Write);
+}
+
+/// Recomputes them and reports whether the committed ones still match.
+///
+/// A recursive circuit compiles whatever hashes it was given, so a stale
+/// file is not a build error: it is a proof that fails to verify, later and
+/// somewhere else. This is the check that turns that into a failure here.
+pub fn check(circuits_root: &Path) -> bool {
+    emit(circuits_root, Mode::Check)
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Mode {
+    Write,
+    Check,
+}
+
+fn emit(circuits_root: &Path, mode: Mode) -> bool {
     let work = Scratch::new("keys");
+
+    let mut current = true;
 
     for (destination, inner) in TARGETS {
         let mut body = String::from(HEADER);
@@ -103,9 +125,26 @@ pub fn write(circuits_root: &Path) {
 
         let path = circuits_root.join(destination);
 
-        std::fs::write(&path, body.trim_end().to_string() + "\n")
-            .expect("cannot write the key hashes");
+        let wanted = body.trim_end().to_string() + "\n";
+
+        if mode == Mode::Check {
+            let committed = std::fs::read_to_string(&path).unwrap_or_default();
+
+            if committed == wanted {
+                println!("current  {destination}");
+            } else {
+                println!("STALE    {destination}");
+
+                current = false;
+            }
+
+            continue;
+        }
+
+        std::fs::write(&path, wanted).expect("cannot write the key hashes");
 
         println!("wrote {}", path.display());
     }
+
+    current
 }

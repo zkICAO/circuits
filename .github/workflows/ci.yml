@@ -45,6 +45,22 @@ jobs:
       - name: Layout manifest generates
         run: cargo run --manifest-path fixtures/generator/Cargo.toml -- manifest /tmp/layout.manifest
 
+      # A recursive circuit compiles whatever key hashes it was given, so a
+      # stale keys.nr is not a build error: it is a proof that fails to
+      # verify, later and somewhere else. This is where that becomes a
+      # failure. It needs the backend, because a verification key hash is
+      # what the backend computes.
+      - name: Install Barretenberg
+        run: |
+          curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/master/barretenberg/bbup/install | bash
+          echo "$HOME/.bb" >> "$GITHUB_PATH"
+
+      - name: Pin bb
+        run: bbup --version 4.2.0-aztecnr-rc.2
+
+      - name: Pinned key hashes are current
+        run: cargo run --manifest-path fixtures/generator/Cargo.toml -- keys --check
+
       - name: Generator tests
         run: cargo test --manifest-path fixtures/generator/Cargo.toml
 
