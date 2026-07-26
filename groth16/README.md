@@ -54,17 +54,40 @@ cargo install --git https://github.com/iden3/circom-witnesscalc \
 build-circuit bin/predicate/compare/main.circom build/compare.graph
 ```
 
-One property to know before building on this. The graph walker evaluates
-assignments and checks no constraints, so an opening that belongs to no
-commitment still produces a witness. The JavaScript calculator refuses the
-same input, so the two disagree about when the failure appears. On this path
-it surfaces at proving, which fails. Treat a produced witness as a produced
-witness and take the proof as the answer.
+Proving is rapidsnark, over its C interface, behind the `rapidsnark`
+feature because the library is not on crates.io and has to be built for the
+host. Everything stays in memory: a proving key and a witness are the two
+things a holder must not leave on disk, and the interface takes both as
+buffers.
 
-That is the same shape as the property the Noir side records for
-Barretenberg, where proving succeeds over an unsatisfied witness and
-verification is what fails. In both stacks the rule is the same: the step
-that produces something is not the step that checks it.
+```
+git clone --recursive https://github.com/iden3/rapidsnark
+cd rapidsnark && ./build_gmp.sh macos_arm64 && make macos_arm64
+export RAPIDSNARK_LIB=$PWD/package_macos_arm64/lib
+
+cargo test --features rapidsnark
+```
+
+One property to know before building on this, and it is the same property
+the Noir side records for Barretenberg. Neither the graph walker nor
+rapidsnark checks a constraint: an opening that belongs to no commitment
+produces a witness, and that witness produces a proof. Verification is what
+refuses it, and this is checked rather than asserted, by proving such a
+witness and asking snarkjs, which answers `Invalid proof`.
+
+So on both stacks the rule is one rule: a produced proof is not a valid
+proof, and only verifying answers the question. An integration that treats
+production as validation is wrong in both.
+
+The JavaScript witness calculator does refuse the same input, which is why
+it can look as though generating a witness validates it. It does not, on the
+path a deployment uses.
+
+One compilation detail matters and is easy to lose. The proving key and the
+witness graph must come from the same circom optimization level, because the
+witness width depends on it: `tools/setup.sh` passes `--O2` to match what
+`build-circuit` applies, and a mismatch surfaces as rapidsnark reporting a
+witness that belongs to another circuit.
 
 ## Measured
 

@@ -19,6 +19,9 @@
 
 use std::collections::HashMap;
 
+#[cfg(feature = "rapidsnark")]
+pub mod prove;
+
 pub mod witness;
 
 /// Which statement a proof makes about a committed field. The names are the

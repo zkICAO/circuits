@@ -21,5 +21,18 @@ circom-witnesscalc = { git = "https://github.com/iden3/circom-witnesscalc", rev 
 
 serde_json = "1"
 
+[features]
+# Proving needs rapidsnark, which is not on crates.io and has to be built for
+# the host. Without this feature the crate still generates witnesses, which
+# is the half with no native dependency. Point RAPIDSNARK_LIB at the built
+# library directory:
+#
+#     git clone --recursive https://github.com/iden3/rapidsnark
+#     cd rapidsnark && ./build_gmp.sh macos_arm64 && make macos_arm64
+#     export RAPIDSNARK_LIB=$PWD/package_macos_arm64/lib
+rapidsnark = []
+
+[build-dependencies]
+
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

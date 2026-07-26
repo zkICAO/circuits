@@ -30,7 +30,10 @@ snarkjs powersoftau verify "$ptau" >/dev/null
 
 echo "powers of tau verified"
 
-circom "$here/bin/predicate/$statement/main.circom" --r1cs --wasm -o "$here/build" >/dev/null
+# --O2 to match what build-circuit applies when it builds the witness
+# graph. Without it the proving key expects a wider witness than the graph
+# produces, and rapidsnark rejects it as belonging to another circuit.
+circom "$here/bin/predicate/$statement/main.circom" --r1cs --wasm --O2 -o "$here/build" >/dev/null
 
 snarkjs groth16 setup "$here/build/main.r1cs" "$ptau" "$here/build/${statement}_0000.zkey" >/dev/null
 
@@ -45,5 +48,15 @@ snarkjs zkey export verificationkey \
   "$here/build/${statement}_vk.json" >/dev/null
 
 echo "phase 2 done for $statement: build/$statement.zkey and build/${statement}_vk.json"
+
+# The graph the Rust prover walks, from the same source and the same
+# optimization as the key, which is what makes the two compatible.
+if command -v build-circuit >/dev/null; then
+  build-circuit "$here/bin/predicate/$statement/main.circom" "$here/build/$statement.graph" >/dev/null
+
+  echo "witness graph at build/$statement.graph"
+else
+  echo "build-circuit not on PATH, so no witness graph; see the README to install it"
+fi
 
 echo "the proving key is local and ignored by git; a deployment runs its own ceremony"
