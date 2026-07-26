@@ -43,6 +43,14 @@ const ISSUING_STATE_FIELD: &str = "2";
 
 const DOCUMENT_NUMBER_FIELD: &str = "3";
 
+/// Fifteen other Doc 9303 country codes, so the membership set the verifier
+/// publishes is a real list rather than one entry. The specimen state UTO
+/// and the codes for holders without a nationality are the standard's own.
+const OTHER_COUNTRIES: [&str; 15] = [
+    "UTO", "VNM", "DEU", "FRA", "GBR", "USA", "JPN", "KOR", "SGP", "THA", "IDN", "MYS", "PHL",
+    "XXA", "D<<",
+];
+
 pub struct Bundle {
     pub directory: PathBuf,
     pub econtent_binding: String,
@@ -239,14 +247,30 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     //    tool so it is the same hashing the circuit recomputes.
     let nationality = opening_for(circuits_root, &dg1, NATIONALITY_FIELD);
 
-    let set_siblings: Vec<String> = (0..8).map(|level| (level + 600).to_string()).collect();
+    // A real list, not a placeholder: the holder's nationality among fifteen
+    // other Doc 9303 country codes, in a tree of the depth the predicate is
+    // built for.
+    let mut set_leaves = Vec::new();
+
+    for code in OTHER_COUNTRIES {
+        let mut witness = String::new();
+
+        array(&mut witness, "data", &packed_country(code));
+
+        set_leaves.push(run_circuit(circuits_root, "set_entry_leaf", &witness)[0].clone());
+    }
 
     let mut witness = String::new();
 
     array(&mut witness, "data", &nationality[0..4]);
-    array(&mut witness, "set_siblings", &set_siblings);
 
-    let set_root = run_circuit(circuits_root, "set_witness", &witness)[0].clone();
+    let holder_entry = run_circuit(circuits_root, "set_entry_leaf", &witness)[0].clone();
+
+    let set_index = 5;
+
+    set_leaves.insert(set_index, holder_entry);
+
+    let (set_root, set_siblings) = tree(circuits_root, &set_leaves, set_index, 8);
 
     let mut witness = String::new();
 
@@ -254,7 +278,7 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     array(&mut witness, "data", &nationality[0..4]);
     value(&mut witness, "entropy", &nationality[5]);
     array(&mut witness, "siblings", &nationality[6..10]);
-    value(&mut witness, "set_index", "0");
+    value(&mut witness, "set_index", &set_index.to_string());
     array(&mut witness, "set_siblings", &set_siblings);
     value(&mut witness, "field_id", NATIONALITY_FIELD);
     value(&mut witness, "commitment", &commitment);
@@ -276,22 +300,35 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     //    rest of a published registry; a real one supplies them from its own
     //    tree. The leaf and the root come from the tool, so they are the same
     //    hashes the circuit recomputes rather than a second implementation.
-    let siblings: Vec<String> = (0..16).map(|level| (level + 700).to_string()).collect();
+    // A registry with several real signer keys in it, so inclusion is proved
+    // against a set rather than against one leaf and arbitrary siblings.
+    let mut registry_leaves = Vec::new();
 
-    let mut witness = String::new();
+    for other in 0..3 {
+        let signer = ec::generate(&ec::P256, &work.join(&format!("registry{other}.pem")));
 
-    bytes(&mut witness, "pubkey_x", &key.public_x, 32);
-    bytes(&mut witness, "pubkey_y", &key.public_y, 32);
-    array(&mut witness, "siblings", &siblings);
+        registry_leaves.push(pubkey_leaf(
+            circuits_root,
+            &signer.public_x,
+            &signer.public_y,
+        ));
+    }
 
-    let registry_root = run_circuit(circuits_root, "registry_witness", &witness)[1].clone();
+    let registry_index = 2;
+
+    registry_leaves.insert(
+        registry_index,
+        pubkey_leaf(circuits_root, &key.public_x, &key.public_y),
+    );
+
+    let (registry_root, siblings) = tree(circuits_root, &registry_leaves, registry_index, 16);
 
     let mut witness = String::new();
 
     bytes(&mut witness, "pubkey_x", &key.public_x, 32);
     bytes(&mut witness, "pubkey_y", &key.public_y, 32);
     value(&mut witness, "salt", DSC_SALT);
-    value(&mut witness, "index", "0");
+    value(&mut witness, "index", &registry_index.to_string());
     array(&mut witness, "siblings", &siblings);
     value(&mut witness, "registry_root", &registry_root);
     value(&mut witness, "domain", DOMAIN);
@@ -328,14 +365,17 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
 
     let authority_signature = rsa::sign_sha256(&authority, &certificate.tbs);
 
-    let list_siblings: Vec<String> = (0..10).map(|level| (level + 800).to_string()).collect();
+    // A master list with more than one country signing key in it.
+    let other_authority = rsa::generate(&work.join("bundle-csca-other.pem"));
 
-    let mut witness = String::new();
+    let list_index = 1;
 
-    limbs(&mut witness, "modulus_limbs", &authority.modulus_limbs());
-    array(&mut witness, "siblings", &list_siblings);
+    let list_leaves = vec![
+        modulus_leaf(circuits_root, &other_authority.modulus_limbs()),
+        modulus_leaf(circuits_root, &authority.modulus_limbs()),
+    ];
 
-    let master_list_root = run_circuit(circuits_root, "master_list_witness", &witness)[1].clone();
+    let (master_list_root, list_siblings) = tree(circuits_root, &list_leaves, list_index, 10);
 
     let mut witness = String::new();
 
@@ -363,7 +403,7 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     );
     limbs(&mut witness, "authority_redc", &authority.redc_limbs());
     limbs(&mut witness, "authority_signature", &authority_signature);
-    value(&mut witness, "authority_index", "0");
+    value(&mut witness, "authority_index", &list_index.to_string());
     array(&mut witness, "authority_siblings", &list_siblings);
     value(&mut witness, "salt", DSC_SALT);
     value(&mut witness, "master_list_root", &master_list_root);
@@ -830,6 +870,78 @@ fn numeric(text: &str) -> u64 {
     } else {
         text.parse().expect("a numeric output does not parse")
     }
+}
+
+/// Packs a three letter country code the way `normalize::pack_to_4` packs
+/// any byte field shorter than one element: big endian, remaining elements
+/// zero. This builds the verifier's own list, not anything a circuit reads,
+/// and the holder's own entry comes from the opening tool rather than here.
+fn packed_country(code: &str) -> Vec<String> {
+    let bytes = code.as_bytes();
+
+    assert_eq!(bytes.len(), 3, "a country code is three characters");
+
+    let packed = bytes
+        .iter()
+        .fold(0u32, |accumulator, byte| (accumulator << 8) | *byte as u32);
+
+    vec![
+        packed.to_string(),
+        "0".to_string(),
+        "0".to_string(),
+        "0".to_string(),
+    ]
+}
+
+/// The leaf an elliptic curve signer key takes in a registry.
+fn pubkey_leaf(circuits_root: &Path, x: &[u8], y: &[u8]) -> String {
+    let mut witness = String::new();
+
+    bytes(&mut witness, "pubkey_x", x, 32);
+    bytes(&mut witness, "pubkey_y", y, 32);
+
+    run_circuit(circuits_root, "pubkey_leaf", &witness)[0].clone()
+}
+
+/// The leaf a country signing key takes in a master list.
+fn modulus_leaf(circuits_root: &Path, modulus: &[u128]) -> String {
+    let mut witness = String::new();
+
+    limbs(&mut witness, "modulus_limbs", modulus);
+
+    run_circuit(circuits_root, "modulus_leaf", &witness)[0].clone()
+}
+
+/// Builds a real tree over the leaves given and returns its root with the
+/// sibling path for one of them, cut to the depth the consuming circuit
+/// takes. Unused slots stay zero, which is the empty leaf of the padding
+/// convention, so a partly filled tree is the same construction as a full
+/// one.
+fn tree(
+    circuits_root: &Path,
+    leaves: &[String],
+    index: usize,
+    depth: usize,
+) -> (String, Vec<String>) {
+    assert!(leaves.len() <= 16, "the tool takes at most sixteen leaves");
+
+    assert!(index < leaves.len(), "the index has to name a leaf");
+
+    let mut padded: Vec<String> = leaves.to_vec();
+
+    padded.resize(16, "0".to_string());
+
+    let mut witness = String::new();
+
+    array(&mut witness, "leaves", &padded);
+    value(&mut witness, "index", &index.to_string());
+    value(&mut witness, "depth", &depth.to_string());
+
+    let output = run_circuit(circuits_root, "merkle_path", &witness);
+
+    assert_eq!(output.len(), 17, "a root and sixteen sibling levels");
+
+    (output[0].clone(), output[1..=depth].to_vec())
 }
 
 /// Writes u128 limbs the way the bignum witnesses take them.

@@ -1,5 +1,5 @@
 [package]
-name = "master_list_witness"
+name = "merkle_path"
 type = "bin"
 authors = []
 compiler_version = ">=1.0.0"

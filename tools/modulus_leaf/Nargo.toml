@@ -1,5 +1,5 @@
 [package]
-name = "registry_witness"
+name = "modulus_leaf"
 type = "bin"
 authors = []
 compiler_version = ">=1.0.0"

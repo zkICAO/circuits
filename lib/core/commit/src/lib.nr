@@ -241,6 +241,33 @@ pub fn root16(leaves: [Field; 16]) -> Field {
 
 /// Walks a Merkle path of any depth. The index supplies one direction bit
 /// per level, so a sibling can never be applied on the wrong side.
+/// The root of an empty subtree of the given height, which is what a sibling
+/// is at a level where a sparse tree holds nothing.
+///
+/// The convention is that an absent leaf is zero and every level above is
+/// that level's empty root paired with itself. It has to be a convention
+/// rather than a choice per caller: a root is only comparable between the
+/// party that published the tree and the circuit that walks it if both pad
+/// the same way, and a registry with a few hundred entries in a depth
+/// sixteen tree is mostly padding.
+///
+/// Zero is safe as the empty leaf because every real leaf is a tagged
+/// Poseidon2 hash of three inputs or more, and no such hash is zero short of
+/// a preimage of it.
+pub fn empty_subtree(height: u32) -> Field {
+    assert(height < 32, "commit: subtree height out of range");
+
+    let mut current: Field = 0;
+
+    for level in 0..32 {
+        if level < height {
+            current = Poseidon2::hash([current, current], 2);
+        }
+    }
+
+    current
+}
+
 pub fn walk_path<let D: u32>(leaf_value: Field, index: u32, siblings: [Field; D]) -> Field {
     assert(D < 32, "commit: path depth out of range");
 
@@ -417,4 +444,73 @@ fn folding_separates_widths() {
     let padded: [u128; 3] = [5, 6, 0];
 
     assert(modulus_hash(short) != modulus_hash(padded));
+}
+
+// A sparse tree has to agree with the path walk, or a published root and a
+// circuit that verifies against it are two different trees. Sixteen real
+// leaves sit at the bottom of a depth eight tree here, and the twelve
+// levels above them are padding.
+#[test]
+fn a_padded_tree_agrees_with_the_path_walk() {
+    let mut leaves: [Field; 16] = [0; 16];
+
+    for i in 0..16 {
+        leaves[i] = leaf(
+            i as Field + 1,
+            3,
+            [i as Field + 100, 0, 0, 0],
+            i as Field + 900,
+        );
+    }
+
+    let mut siblings: [Field; 8] = [0; 8];
+
+    // The four levels the real leaves span, for the leaf at index zero.
+    let mut l8: [Field; 8] = [0; 8];
+
+    for i in 0..8 {
+        l8[i] = hash_pair(leaves[2 * i], leaves[2 * i + 1]);
+    }
+
+    let mut l4: [Field; 4] = [0; 4];
+
+    for i in 0..4 {
+        l4[i] = hash_pair(l8[2 * i], l8[2 * i + 1]);
+    }
+
+    let mut l2: [Field; 2] = [0; 2];
+
+    for i in 0..2 {
+        l2[i] = hash_pair(l4[2 * i], l4[2 * i + 1]);
+    }
+
+    siblings[0] = leaves[1];
+
+    siblings[1] = l8[1];
+
+    siblings[2] = l4[1];
+
+    siblings[3] = l2[1];
+
+    // Everything above is empty.
+    for level in 4..8 {
+        siblings[level] = empty_subtree(level as u32);
+    }
+
+    let mut expected = root16(leaves);
+
+    for level in 4..8 {
+        expected = hash_pair(expected, empty_subtree(level as u32));
+    }
+
+    assert(walk_path(leaves[0], 0, siblings) == expected);
+}
+
+#[test]
+fn an_empty_subtree_is_built_from_zero_upwards() {
+    assert(empty_subtree(0) == 0);
+
+    assert(empty_subtree(1) == hash_pair(0, 0));
+
+    assert(empty_subtree(2) == hash_pair(hash_pair(0, 0), hash_pair(0, 0)));
 }
