@@ -30,11 +30,13 @@
 
 use bigcurve::curves::secp256r1::{Secp256r1_Fq, Secp256r1_Fr};
 
+use bigcurve::curves::brainpoolP384r1::{BrainpoolP384r1_Fq, BrainpoolP384r1_Fr};
+
 use bigcurve::curves::secp384r1::{Secp384r1_Fq, Secp384r1_Fr};
 
 use bignum::BigNum;
 
-use ecdsa::ecdsa::{verify_secp256r1_ecdsa, verify_secp384r1_ecdsa};
+use ecdsa::ecdsa::{verify_brainpoolp384r1_ecdsa, verify_secp256r1_ecdsa, verify_secp384r1_ecdsa};
 
 pub fn verify_ecdsa_p256<let H: u32>(
     pubkey_x: [u8; 32],
@@ -88,6 +90,37 @@ pub fn verify_ecdsa_p384<let H: u32>(
     s.validate_in_field();
 
     assert(verify_secp384r1_ecdsa(x, y, msg_hash, (r, s)), "sig: ecdsa p256 verification failed");
+}
+
+/// Brainpool P-384r1, the other 384 bit curve Doc 9303 permits. Some
+/// states sign with it rather than with the NIST curve.
+pub fn verify_ecdsa_brainpool384r1<let H: u32>(
+    pubkey_x: [u8; 48],
+    pubkey_y: [u8; 48],
+    msg_hash: [u8; H],
+    sig_r: [u8; 48],
+    sig_s: [u8; 48],
+) {
+    let x: BrainpoolP384r1_Fq = BrainpoolP384r1_Fq::from_be_bytes(pubkey_x);
+
+    let y: BrainpoolP384r1_Fq = BrainpoolP384r1_Fq::from_be_bytes(pubkey_y);
+
+    let r: BrainpoolP384r1_Fr = BrainpoolP384r1_Fr::from_be_bytes(sig_r);
+
+    let s: BrainpoolP384r1_Fr = BrainpoolP384r1_Fr::from_be_bytes(sig_s);
+
+    x.validate_in_field();
+
+    y.validate_in_field();
+
+    r.validate_in_field();
+
+    s.validate_in_field();
+
+    assert(
+        verify_brainpoolp384r1_ecdsa(x, y, msg_hash, (r, s)),
+        "sig: ecdsa p256 verification failed",
+    );
 }
 
 // Vector generated with openssl (prime256v1, sha256) and verified by

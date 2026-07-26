@@ -21,6 +21,12 @@ pub const RSA2048: Size = Size {
     limbs: 18,
 };
 
+/// 3072 bits needs 26 limbs.
+pub const RSA3072: Size = Size {
+    bits: 3072,
+    limbs: 26,
+};
+
 /// 4096 bits needs 35 limbs by the same arithmetic.
 pub const RSA4096: Size = Size {
     bits: 4096,

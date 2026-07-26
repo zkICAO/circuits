@@ -467,16 +467,37 @@ fn emit_rsa_document(body: &mut String, work_dir: &scratch::Scratch) {
 
     emit_limbs(body, "RSA_SIGNATURE_LIMBS", &signature);
 
+    emit_rsa_size_document(body, work_dir, rsa::RSA3072, "RSA3072", "RSA-3072");
+
     emit_wide_rsa_document(body, work_dir);
 
     emit_p384_document(body, work_dir);
+
+    emit_curve_document(
+        body,
+        work_dir,
+        &ec::BRAINPOOL_P384R1,
+        "BRAINPOOL384",
+        "brainpoolP384r1",
+    );
 }
 
 /// The same document over P-384, the wider curve Doc 9303 permits. Its
 /// coordinates and signature components are 48 bytes rather than 32, so
 /// every buffer widens with the curve.
 fn emit_p384_document(body: &mut String, work_dir: &scratch::Scratch) {
-    let key = ec::generate(&ec::P384, &work_dir.join("dsc-p384.pem"));
+    emit_curve_document(body, work_dir, &ec::P384, "P384", "P-384");
+}
+
+/// A document signed with one elliptic curve, under one constant prefix.
+fn emit_curve_document(
+    body: &mut String,
+    work_dir: &scratch::Scratch,
+    curve: &'static ec::Curve,
+    prefix: &str,
+    description: &str,
+) {
+    let key = ec::generate(curve, &work_dir.join(&format!("dsc-{prefix}.pem")));
 
     let dg1 = icao::build_dg1(icao::MRZ_TD3);
 
@@ -499,48 +520,73 @@ fn emit_p384_document(body: &mut String, work_dir: &scratch::Scratch) {
 
     writeln!(
         body,
-        "// The same TD3 document signed with a P-384 Document Signer key."
+        "// The same TD3 document signed with a {description} Document Signer key."
     )
     .unwrap();
 
     emit_bytes(
         body,
-        "P384_ECONTENT",
+        &format!("{prefix}_ECONTENT"),
         &security_object.econtent,
         ECONTENT_BUFFER,
     );
 
-    emit_u32(body, "P384_ECONTENT_LEN", security_object.econtent.len());
+    emit_u32(
+        body,
+        &format!("{prefix}_ECONTENT_LEN"),
+        security_object.econtent.len(),
+    );
 
     emit_bytes(
         body,
-        "P384_SIGNED_ATTRS",
+        &format!("{prefix}_SIGNED_ATTRS"),
         &signed_attrs.bytes,
         SIGNED_ATTRS_BUFFER,
     );
 
-    emit_u32(body, "P384_SIGNED_ATTRS_LEN", signed_attrs.bytes.len());
+    emit_u32(
+        body,
+        &format!("{prefix}_SIGNED_ATTRS_LEN"),
+        signed_attrs.bytes.len(),
+    );
 
-    emit_u32(body, "P384_DIGEST_OFFSET", signed_attrs.digest_offset);
+    emit_u32(
+        body,
+        &format!("{prefix}_DIGEST_OFFSET"),
+        signed_attrs.digest_offset,
+    );
 
     for (number, offset) in &security_object.dg_offsets {
-        emit_u32(body, &format!("P384_DG{number}_OFFSET"), *offset);
+        emit_u32(body, &format!("{prefix}_DG{number}_OFFSET"), *offset);
     }
 
-    emit_bytes(body, "P384_DSC_PUBKEY_X", &key.public_x, 48);
+    emit_bytes(body, &format!("{prefix}_DSC_PUBKEY_X"), &key.public_x, 48);
 
-    emit_bytes(body, "P384_DSC_PUBKEY_Y", &key.public_y, 48);
+    emit_bytes(body, &format!("{prefix}_DSC_PUBKEY_Y"), &key.public_y, 48);
 
-    emit_bytes(body, "P384_SIGNATURE_R", &signature.r, 48);
+    emit_bytes(body, &format!("{prefix}_SIGNATURE_R"), &signature.r, 48);
 
-    emit_bytes(body, "P384_SIGNATURE_S", &signature.s, 48);
+    emit_bytes(body, &format!("{prefix}_SIGNATURE_S"), &signature.s, 48);
 }
 
 /// The same document signed with a 4096 bit key. States do sign with wider
 /// keys than 2048, and every derived value widens with the modulus, so the
 /// fixture carries both rather than assuming one size fits.
 fn emit_wide_rsa_document(body: &mut String, work_dir: &scratch::Scratch) {
-    let key = rsa::generate_sized(&work_dir.join("dsc-rsa4096.pem"), rsa::RSA4096);
+    emit_rsa_size_document(body, work_dir, rsa::RSA4096, "RSA4096", "RSA-4096");
+}
+
+/// A document signed at one modulus size, under one constant prefix. Every
+/// derived value widens with the modulus: the limbs, the Barrett parameter
+/// and the signature.
+fn emit_rsa_size_document(
+    body: &mut String,
+    work_dir: &scratch::Scratch,
+    size: rsa::Size,
+    prefix: &str,
+    description: &str,
+) {
+    let key = rsa::generate_sized(&work_dir.join(&format!("dsc-{prefix}.pem")), size);
 
     let dg1 = icao::build_dg1(icao::MRZ_TD3);
 
@@ -563,39 +609,55 @@ fn emit_wide_rsa_document(body: &mut String, work_dir: &scratch::Scratch) {
 
     writeln!(
         body,
-        "// The same TD3 document signed with an RSA-4096 Document Signer key."
+        "// The same TD3 document signed with an {description} Document Signer key."
     )
     .unwrap();
 
     emit_bytes(
         body,
-        "RSA4096_ECONTENT",
+        &format!("{prefix}_ECONTENT"),
         &security_object.econtent,
         ECONTENT_BUFFER,
     );
 
-    emit_u32(body, "RSA4096_ECONTENT_LEN", security_object.econtent.len());
+    emit_u32(
+        body,
+        &format!("{prefix}_ECONTENT_LEN"),
+        security_object.econtent.len(),
+    );
 
     emit_bytes(
         body,
-        "RSA4096_SIGNED_ATTRS",
+        &format!("{prefix}_SIGNED_ATTRS"),
         &signed_attrs.bytes,
         SIGNED_ATTRS_BUFFER,
     );
 
-    emit_u32(body, "RSA4096_SIGNED_ATTRS_LEN", signed_attrs.bytes.len());
+    emit_u32(
+        body,
+        &format!("{prefix}_SIGNED_ATTRS_LEN"),
+        signed_attrs.bytes.len(),
+    );
 
-    emit_u32(body, "RSA4096_DIGEST_OFFSET", signed_attrs.digest_offset);
+    emit_u32(
+        body,
+        &format!("{prefix}_DIGEST_OFFSET"),
+        signed_attrs.digest_offset,
+    );
 
     for (number, offset) in &security_object.dg_offsets {
-        emit_u32(body, &format!("RSA4096_DG{number}_OFFSET"), *offset);
+        emit_u32(body, &format!("{prefix}_DG{number}_OFFSET"), *offset);
     }
 
-    emit_limbs(body, "RSA4096_MODULUS_LIMBS", &key.modulus_limbs());
+    emit_limbs(
+        body,
+        &format!("{prefix}_MODULUS_LIMBS"),
+        &key.modulus_limbs(),
+    );
 
-    emit_limbs(body, "RSA4096_REDC_LIMBS", &key.redc_limbs());
+    emit_limbs(body, &format!("{prefix}_REDC_LIMBS"), &key.redc_limbs());
 
-    emit_limbs(body, "RSA4096_SIGNATURE_LIMBS", &signature);
+    emit_limbs(body, &format!("{prefix}_SIGNATURE_LIMBS"), &signature);
 }
 
 /// A country signing key over a Document Signer certificate, which is the
