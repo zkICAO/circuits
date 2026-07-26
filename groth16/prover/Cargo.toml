@@ -1,0 +1,25 @@
+[package]
+name = "zkicao-groth16"
+version = "0.1.0"
+edition = "2021"
+description = "Proving zkICAO predicates with Groth16, in Rust, without a JavaScript or WebAssembly runtime"
+license = "MIT"
+
+[dependencies]
+# Witness generation in Rust from the circuit graph circom emits. The
+# JavaScript witness calculator is for development; a holder proving on a
+# phone runs this.
+#
+# Pinned by revision rather than by version, because the graph is a private
+# format shared between the builder and the calculator: a graph written by
+# one revision is not readable by another, and the published 0.2 does not
+# ship the builder at all. Build it from the same revision:
+#
+#     cargo install --git https://github.com/iden3/circom-witnesscalc \
+#       --rev d48eb7c97857d46b8a75c94ab96f769207263245 build-circuit
+circom-witnesscalc = { git = "https://github.com/iden3/circom-witnesscalc", rev = "d48eb7c97857d46b8a75c94ab96f769207263245" }
+
+serde_json = "1"
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }

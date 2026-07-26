@@ -80,8 +80,10 @@ echo "2. a whole opening, from a commitment the Noir circuits made"
 
 opening="$circuits/bin/predicate/compare/Prover.toml"
 
-if [ ! -f "$opening" ]; then
-  echo "   skipped: no witness at $opening, run the bundle command first"
+membership="$circuits/bin/predicate/member/Prover.toml"
+
+if [ ! -f "$opening" ] || [ ! -f "$membership" ]; then
+  echo "   skipped: no witnesses beside the Noir predicates, run the bundle command first"
 
   exit 0
 fi
@@ -132,6 +134,84 @@ node "$work/main_js/generate_witness.js" \
   "$work/main_js/main.wasm" "$work/opening.json" "$work/opening.wtns" >/dev/null
 
 echo "   the circom predicate opens it"
+
+# The other two statements open the same commitment, so each is checked
+# against the witness the Noir circuit of that name was given.
+python3 - "$membership" "$opening" "$work" <<'PYEOF2'
+import json
+import re
+import sys
+from pathlib import Path
+
+
+def read(path):
+    return Path(path).read_text()
+
+
+def number(text):
+    return str(int(text, 16) if text.startswith('0x') else int(text))
+
+
+def scalar(toml, name):
+    return number(re.search(rf'^{name} = "([^"]+)"', toml, re.M).group(1))
+
+
+def array(toml, name):
+    body = re.search(rf'^{name} = \[(.*?)\]', toml, re.M | re.S).group(1)
+
+    return [number(v) for v in re.findall(r'"([^"]+)"', body)]
+
+
+member = read(sys.argv[1])
+
+compare = read(sys.argv[2])
+
+work = Path(sys.argv[3])
+
+(work / 'member.json').write_text(
+    json.dumps(
+        {
+            'fieldId': scalar(member, 'field_id'),
+            'commitment': scalar(member, 'commitment'),
+            'setRoot': scalar(member, 'set_root'),
+            'domain': scalar(member, 'domain'),
+            'length': scalar(member, 'length'),
+            'data': array(member, 'data'),
+            'entropy': scalar(member, 'entropy'),
+            'siblings': array(member, 'siblings'),
+            'setIndex': scalar(member, 'set_index'),
+            'setSiblings': array(member, 'set_siblings'),
+        }
+    )
+)
+
+# No Noir reveal witness is produced by the bundle, so the compare opening
+# is disclosed instead: the same field, a different statement about it.
+(work / 'reveal.json').write_text(
+    json.dumps(
+        {
+            'fieldId': scalar(compare, 'field_id'),
+            'commitment': scalar(compare, 'commitment'),
+            'revealed': array(compare, 'data'),
+            'revealedLength': scalar(compare, 'length'),
+            'domain': scalar(compare, 'domain'),
+            'entropy': scalar(compare, 'entropy'),
+            'siblings': array(compare, 'siblings'),
+        }
+    )
+)
+PYEOF2
+
+for statement in member reveal; do
+  mkdir -p "$work/$statement"
+
+  circom "$here/bin/predicate/$statement/main.circom" --wasm -o "$work/$statement" >/dev/null
+
+  node "$work/$statement/main_js/generate_witness.js" \
+    "$work/$statement/main_js/main.wasm" "$work/$statement.json" "$work/$statement.wtns" >/dev/null
+
+  echo "   the circom $statement predicate opens it too"
+done
 
 echo "3. and refuses openings it should"
 

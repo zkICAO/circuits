@@ -35,12 +35,45 @@ The whole opening agrees. A commitment and a field opening produced by the Noir 
 
 Both are run by `test/check.sh`.
 
+## Proving in Rust, without a JavaScript or WebAssembly runtime
+
+`prover/` is the path a holder's device takes. circom emits a graph beside
+the circuit, `circom-witnesscalc` walks it in Rust, and the graph is held
+once rather than reread per proof. The JavaScript calculator is for
+development.
+
+The dependency is pinned by revision, not by version. The graph is a private
+format shared between the builder and the calculator, so a graph written by
+one revision is not readable by another, and the published 0.2 does not ship
+the builder at all. Build the builder from the same revision:
+
+```
+cargo install --git https://github.com/iden3/circom-witnesscalc \
+  --rev d48eb7c97857d46b8a75c94ab96f769207263245 build-circuit
+
+build-circuit bin/predicate/compare/main.circom build/compare.graph
+```
+
+One property to know before building on this. The graph walker evaluates
+assignments and checks no constraints, so an opening that belongs to no
+commitment still produces a witness. The JavaScript calculator refuses the
+same input, so the two disagree about when the failure appears. On this path
+it surfaces at proving, which fails. Treat a produced witness as a produced
+witness and take the proof as the answer.
+
+That is the same shape as the property the Noir side records for
+Barretenberg, where proving succeeds over an unsatisfied witness and
+verification is what fails. In both stacks the rule is the same: the step
+that produces something is not the step that checks it.
+
 ## Measured
 
 | What | Groth16 here | UltraHonk in the Noir tree |
 |---|---:|---:|
 | proof, on chain | 256 bytes | 11,072 bytes |
-| constraints | 6,456 | 123 ACIR opcodes |
+| constraints, compare | 6,456 | 123 ACIR opcodes |
+| constraints, member | 11,545 | 230 ACIR opcodes |
+| constraints, reveal | 5,613 | 100 ACIR opcodes |
 
 The comparison is not like for like and is not meant to be: the two systems count different things. What it does show is the reason this exists, which is the proof size a contract pays for.
 
