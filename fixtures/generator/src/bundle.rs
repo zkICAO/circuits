@@ -35,6 +35,8 @@ const TODAY: &str = "20260725";
 /// The birth date field, which a range proof turns into an age check.
 const BIRTH_DATE_FIELD: &str = "5";
 
+const NATIONALITY_FIELD: &str = "4";
+
 const ISSUING_STATE_FIELD: &str = "2";
 
 const DOCUMENT_NUMBER_FIELD: &str = "3";
@@ -230,6 +232,44 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         proving,
     );
 
+    // 5b. The nationality is in a list the verifier publishes. The set
+    //    siblings stand for the rest of that list; the root comes from the
+    //    tool so it is the same hashing the circuit recomputes.
+    let nationality = opening_for(circuits_root, &dg1, NATIONALITY_FIELD);
+
+    let set_siblings: Vec<String> = (0..8).map(|level| (level + 600).to_string()).collect();
+
+    let mut witness = String::new();
+
+    array(&mut witness, "data", &nationality[0..4]);
+    array(&mut witness, "set_siblings", &set_siblings);
+
+    let set_root = run_circuit(circuits_root, "set_witness", &witness)[0].clone();
+
+    let mut witness = String::new();
+
+    value(&mut witness, "length", &nationality[4]);
+    array(&mut witness, "data", &nationality[0..4]);
+    value(&mut witness, "entropy", &nationality[5]);
+    array(&mut witness, "siblings", &nationality[6..10]);
+    value(&mut witness, "set_index", "0");
+    array(&mut witness, "set_siblings", &set_siblings);
+    value(&mut witness, "field_id", NATIONALITY_FIELD);
+    value(&mut witness, "commitment", &commitment);
+    value(&mut witness, "set_root", &set_root);
+    value(&mut witness, "domain", DOMAIN);
+    value(&mut witness, "context", CONTEXT);
+
+    run_circuit(circuits_root, "predicate_member", &witness);
+
+    prove(
+        circuits_root,
+        out,
+        "predicate_member",
+        "predicate_member",
+        proving,
+    );
+
     // 6. The signer is one this verifier trusts. The siblings stand for the
     //    rest of a published registry; a real one supplies them from its own
     //    tree. The leaf and the root come from the tool, so they are the same
@@ -377,6 +417,54 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
             out,
             "registration_mrz_td3_ecdsa_p256_sha256_ec512_inclusion",
             "registration",
+            proving,
+        );
+
+        // 9. The two predicates of the session folded into one proof, the
+        //    aggregation a session uses when it asks more than one question.
+        let mut witness = String::new();
+
+        field_elements(
+            &mut witness,
+            "compare_key",
+            &out.join("predicate_compare/vk"),
+        );
+
+        field_elements(
+            &mut witness,
+            "compare_proof",
+            &out.join("predicate_compare/proof"),
+        );
+
+        field_elements(&mut witness, "member_key", &out.join("predicate_member/vk"));
+
+        field_elements(
+            &mut witness,
+            "member_proof",
+            &out.join("predicate_member/proof"),
+        );
+
+        value(&mut witness, "commitment", &commitment);
+        value(&mut witness, "compare_field_id", BIRTH_DATE_FIELD);
+        value(&mut witness, "minimum", "0");
+        value(&mut witness, "maximum", "20080725");
+        value(&mut witness, "member_field_id", NATIONALITY_FIELD);
+        value(&mut witness, "set_root", &set_root);
+        value(&mut witness, "domain", DOMAIN);
+        value(&mut witness, "context", CONTEXT);
+
+        let session = run_circuit(circuits_root, "session_compare_member", &witness);
+
+        assert_eq!(
+            session[0], commitment,
+            "the session proof must expose the commitment its predicates opened"
+        );
+
+        prove(
+            circuits_root,
+            out,
+            "session_compare_member",
+            "session",
             proving,
         );
     }

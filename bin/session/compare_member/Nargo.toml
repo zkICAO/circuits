@@ -1,0 +1,8 @@
+[package]
+name = "session_compare_member"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+bb_proof_verification = { git = "https://github.com/AztecProtocol/aztec-packages", tag = "v4.2.0-aztecnr-rc.2", directory = "barretenberg/noir/bb_proof_verification" }

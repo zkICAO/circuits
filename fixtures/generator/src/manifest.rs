@@ -16,8 +16,6 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 /// Packages that solve a witness and are never proved.
-const TOOLS: &[&str] = &["mrz_opening", "registry_witness", "document_secret"];
-
 pub fn write(circuits_root: &Path, destination: &Path) {
     let members = workspace_members(circuits_root);
 
@@ -39,11 +37,14 @@ pub fn write(circuits_root: &Path, destination: &Path) {
             continue;
         }
 
-        let package = package_field(&manifest, "name");
-
-        if TOOLS.contains(&package.as_str()) {
+        // Witness tools live under tools/ and are executed, never proved,
+        // so no verifier reads their public inputs. Excluding them by path
+        // rather than by name means the next tool cannot be forgotten here.
+        if member.starts_with("tools/") {
             continue;
         }
+
+        let package = package_field(&manifest, "name");
 
         let bytecode = circuits_root.join(format!("target/{package}.json"));
 
