@@ -49,6 +49,30 @@ fn version_v3() -> Vec<u8> {
     der::tlv(0xa0, &der::integer_u8(2))
 }
 
+/// A SubjectPublicKeyInfo over a P-256 point, the encoding both a
+/// certificate and DG15 carry, and the offset of the key inside it.
+pub fn subject_public_key_info(public_key_x: &[u8], public_key_y: &[u8]) -> Vec<u8> {
+    let mut point = vec![0x00, 0x04];
+
+    point.extend_from_slice(public_key_x);
+
+    point.extend_from_slice(public_key_y);
+
+    der::sequence(&[
+        der::sequence(&[der::oid(OID_EC_PUBLIC_KEY), der::oid(OID_PRIME256V1)]),
+        der::tlv(TAG_BIT_STRING, &point),
+    ])
+}
+
+/// Where the bit string holding the point begins, measured from the start of
+/// the SubjectPublicKeyInfo.
+pub fn public_key_offset_in_spki(spki: &[u8]) -> usize {
+    let algorithm_len =
+        der::sequence(&[der::oid(OID_EC_PUBLIC_KEY), der::oid(OID_PRIME256V1)]).len();
+
+    der::read(spki, 0).header_len + algorithm_len
+}
+
 pub fn build_dsc_tbs(
     public_key_x: &[u8],
     public_key_y: &[u8],
@@ -61,10 +85,7 @@ pub fn build_dsc_tbs(
 
     point.extend_from_slice(public_key_y);
 
-    let spki = der::sequence(&[
-        der::sequence(&[der::oid(OID_EC_PUBLIC_KEY), der::oid(OID_PRIME256V1)]),
-        der::tlv(TAG_BIT_STRING, &point),
-    ]);
+    let spki = subject_public_key_info(public_key_x, public_key_y);
 
     let validity = der::sequence(&[utc_time(not_before), utc_time(not_after)]);
 
@@ -105,12 +126,7 @@ pub fn build_dsc_tbs(
 
     let not_after_offset = not_before_offset + utc_time(not_before).len();
 
-    // Inside SubjectPublicKeyInfo the BIT STRING follows the algorithm
-    // identifier, which itself follows the outer header.
-    let algorithm_len =
-        der::sequence(&[der::oid(OID_EC_PUBLIC_KEY), der::oid(OID_PRIME256V1)]).len();
-
-    let public_key_offset = spki_start + der::read(&spki, 0).header_len + algorithm_len;
+    let public_key_offset = spki_start + public_key_offset_in_spki(&spki);
 
     let certificate = Certificate {
         tbs,

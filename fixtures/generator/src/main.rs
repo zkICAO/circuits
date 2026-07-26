@@ -181,6 +181,8 @@ fn main() {
 
     emit_certificate_chain(&mut body, &work_dir);
 
+    emit_chip_key(&mut body, &work_dir);
+
     std::fs::write(&out_path, body).expect("cannot write the fixture library");
 
     println!("wrote {}", out_path.display());
@@ -772,3 +774,56 @@ const HEADER: &str = "\
 //! which the circuits require and certificate signatures do not guarantee.
 
 ";
+
+/// The chip's own key pair, in DG15, with a signature over a challenge.
+///
+/// This is what tells a genuine chip from a copy of its data: the private
+/// half never leaves the chip, so a copy cannot answer a challenge the
+/// verifier chose. The challenge here is a session context, which is what
+/// the verifier issues per exchange anyway.
+fn emit_chip_key(body: &mut String, work_dir: &scratch::Scratch) {
+    let key = ec::generate(&ec::P256, &work_dir.join("chip.pem"));
+
+    let spki = cert::subject_public_key_info(&key.public_x, &key.public_y);
+
+    let dg15 = icao::build_dg15(&spki);
+
+    // The key sits at its offset inside the SubjectPublicKeyInfo, which
+    // itself sits after DG15's own two byte template header.
+    let key_offset = 2 + cert::public_key_offset_in_spki(&spki);
+
+    // The challenge is the session context as a 32 byte big endian value. A
+    // real terminal draws one fresh per read; the circuit requires it to
+    // equal the context the verifier published, which is the same thing.
+    let mut challenge = [0u8; 32];
+
+    challenge[31] = 99;
+
+    // The chip signs a digest of the challenge, which is what an elliptic
+    // curve signing interface does and what the circuit recomputes.
+    let signature = ec::sign_sha256(&key, &challenge);
+
+    writeln!(
+        body,
+        "// The chip's Active Authentication key in DG15, and its answer to a"
+    )
+    .unwrap();
+
+    writeln!(
+        body,
+        "// challenge, which a copy of the data could not produce."
+    )
+    .unwrap();
+
+    emit_bytes(body, "DG15", &dg15, 128);
+
+    emit_u32(body, "DG15_LEN", dg15.len());
+
+    emit_u32(body, "DG15_KEY_OFFSET", key_offset);
+
+    emit_bytes(body, "DG15_CHALLENGE", &challenge, 32);
+
+    emit_bytes(body, "DG15_SIGNATURE_R", &signature.r, 32);
+
+    emit_bytes(body, "DG15_SIGNATURE_S", &signature.s, 32);
+}

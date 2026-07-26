@@ -81,6 +81,16 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
 
     let dg1 = icao::build_dg1(icao::MRZ_TD3);
 
+    // The chip's own key pair. Its public half is a data group like any
+    // other, so the Security Object commits to it and an extraction proof
+    // can vouch for it; the private half is what a copy of the data does not
+    // have.
+    let chip_key = ec::generate(&ec::P256, &work.join("chip.pem"));
+
+    let chip_spki = cert::subject_public_key_info(&chip_key.public_x, &chip_key.public_y);
+
+    let dg15 = icao::build_dg15(&chip_spki);
+
     let groups = vec![
         icao::DataGroup {
             number: 1,
@@ -89,6 +99,10 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         icao::DataGroup {
             number: 2,
             content: vec![0x5a; 96],
+        },
+        icao::DataGroup {
+            number: 15,
+            content: dg15.clone(),
         },
     ];
 
@@ -436,6 +450,87 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         out,
         "anchor_csca_chain_rsa2048_sha256_tbs512",
         "anchor_chain",
+        proving,
+    );
+
+    // 6c. The chip itself answered a challenge, which is the one thing in
+    //    this protocol a copy of the data cannot do. Its data group is
+    //    extracted first, exactly as DG1 was, so the key that answered is
+    //    the key the Security Object commits to.
+    let dg15_offset = security_object
+        .dg_offsets
+        .iter()
+        .find(|(number, _)| *number == 15)
+        .expect("the security object must cover DG15")
+        .1;
+
+    let mut witness = String::new();
+
+    bytes(
+        &mut witness,
+        "econtent",
+        &security_object.econtent,
+        ECONTENT_BUFFER,
+    );
+    value(
+        &mut witness,
+        "econtent_len",
+        &security_object.econtent.len().to_string(),
+    );
+    value(
+        &mut witness,
+        "oid_offset",
+        &security_object.oid_offset.to_string(),
+    );
+    value(&mut witness, "dg_offset", &dg15_offset.to_string());
+    value(&mut witness, "dg_number", "15");
+    value(&mut witness, "econtent_binding", &econtent_binding);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
+
+    let chip_binding = run_circuit(circuits_root, "dg_extract_sha256_ec512", &witness)[0].clone();
+
+    prove(
+        circuits_root,
+        out,
+        "dg_extract_sha256_ec512",
+        "dg_extract_chip",
+        proving,
+    );
+
+    let mut challenge = [0u8; 32];
+
+    let context_value: u128 = context().parse().expect("the context is a number");
+
+    for (index, byte) in context_value.to_be_bytes().iter().enumerate() {
+        challenge[16 + index] = *byte;
+    }
+
+    let chip_signature = ec::sign_sha256(&chip_key, &challenge);
+
+    let mut witness = String::new();
+
+    bytes(&mut witness, "dg15", &dg15, 128);
+    value(&mut witness, "dg15_len", &dg15.len().to_string());
+    value(
+        &mut witness,
+        "key_offset",
+        &(2 + cert::public_key_offset_in_spki(&chip_spki)).to_string(),
+    );
+    bytes(&mut witness, "challenge", &challenge, 32);
+    bytes(&mut witness, "signature_r", &chip_signature.r, 32);
+    bytes(&mut witness, "signature_s", &chip_signature.s, 32);
+    value(&mut witness, "dg_binding", &chip_binding);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
+
+    run_circuit(circuits_root, "chip_active_p256_sha256", &witness);
+
+    prove(
+        circuits_root,
+        out,
+        "chip_active_p256_sha256",
+        "chip",
         proving,
     );
 

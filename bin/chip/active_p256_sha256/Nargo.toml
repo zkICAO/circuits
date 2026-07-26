@@ -1,0 +1,13 @@
+[package]
+name = "chip_active_p256_sha256"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../../../lib/core/commit" }
+hash = { path = "../../../lib/core/hash" }
+chip = { path = "../../../lib/emrtd/chip" }
+# testdata is used only by the tests in this package. Nargo has no
+# dev-dependencies section, so this says it instead.
+testdata = { path = "../../../lib/testdata" }

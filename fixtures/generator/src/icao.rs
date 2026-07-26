@@ -272,3 +272,17 @@ mod sizing {
         assert!(econtent_len(16, 32) < 1024);
     }
 }
+
+/// EF.DG15 is the chip's Active Authentication public key, wrapped in its
+/// own template: `6F <len> <SubjectPublicKeyInfo>`. The key inside is the
+/// same uncompressed point encoding a certificate carries, so the same
+/// reader finds it.
+pub fn build_dg15(spki: &[u8]) -> Vec<u8> {
+    let mut out = vec![0x6F];
+
+    out.extend_from_slice(&der::encode_length(spki.len()));
+
+    out.extend_from_slice(spki);
+
+    out
+}

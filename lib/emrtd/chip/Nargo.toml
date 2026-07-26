@@ -1,0 +1,11 @@
+[package]
+name = "chip"
+type = "lib"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../../core/commit" }
+hash = { path = "../../core/hash" }
+sig = { path = "../../core/sig" }
+x509 = { path = "../../core/x509" }

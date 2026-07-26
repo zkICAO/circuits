@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "lib/emrtd/lds",
+    "lib/emrtd/chip",
     "lib/emrtd/cms",
     "lib/core/hash",
     "lib/emrtd/mrz",
@@ -25,6 +26,7 @@ members = [
     "bin/sod/rsa2048_v15_sha256_ec1024",
     "bin/sod/rsa3072_v15_sha256_ec512",
     "bin/sod/rsa4096_v15_sha256_ec512",
+    "bin/chip/active_p256_sha256",
     "bin/dg_extract/sha256_ec512",
     "bin/dg_extract/sha256_ec1024",
     "bin/attributes/mrz_td3_sha256",
@@ -40,6 +42,7 @@ members = [
     "bin/registration/mrz_td3_ecdsa_p256_sha256_ec512_csca_chain",
     "bin/session/compare_member",
     "tools/hash_vectors",
+    "tools/dg_binding_witness",
     "tools/mrz_opening",
     "tools/pubkey_leaf",
     "tools/modulus_leaf",

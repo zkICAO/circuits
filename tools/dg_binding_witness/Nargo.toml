@@ -1,0 +1,9 @@
+[package]
+name = "dg_binding_witness"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../../lib/core/commit" }
+hash = { path = "../../lib/core/hash" }
