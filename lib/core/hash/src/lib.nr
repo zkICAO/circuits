@@ -1,11 +1,10 @@
 //! Message digest entry points.
 //!
-//! ICAO 9303 documents carry two independent hash choices: the digest
-//! algorithm of the CMS SignedData (used for the eContent digest and over
-//! the signed attributes) and the algorithm the Security Object uses for
-//! each data group hash. They are not required to be the same algorithm,
-//! so circuits take them as separate variant dimensions and call the
-//! matching entry point here.
+//! A signed credential can hash its content with one algorithm and sign
+//! with another, so the two are separate variant dimensions of a circuit
+//! rather than one, and each calls the matching entry point here. In Doc
+//! 9303 they are the CMS digest algorithm and the algorithm the Security
+//! Object uses for each data group hash.
 //!
 //! Only SHA-256 ships in the first circuit set. Further algorithms are
 //! added alongside the circuit variants that need them, never earlier.

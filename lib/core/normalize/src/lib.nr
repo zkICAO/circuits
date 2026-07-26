@@ -1,13 +1,9 @@
-//! Field normalization: raw document bytes into the canonical values that
-//! predicates and nullifiers operate on. Dates become YYYYMMDD integers
-//! (see mrz), and byte fields pack big endian into 4 Field elements of up
-//! to 31 bytes each.
-//!
-//! Country codes keep the three letter form Doc 9303 Part 3 defines. That
-//! list extends ISO 3166-1 alpha-3 rather than matching it: it adds codes
-//! for issuing organizations and for holders without a nationality, such
-//! as XXA for refugees and UTO for the specimen state used in examples,
-//! so validation here accepts the ICAO list and not the ISO one.
+//! Field normalization: raw credential bytes into the canonical values that
+//! predicates and nullifiers operate on. Byte fields pack big endian into 4
+//! Field elements of up to 31 bytes each, and dates arrive already resolved
+//! to YYYYMMDD integers by the profile that parsed them, since what a date
+//! looks like on a document is a property of its standard and not of this
+//! layer.
 
 pub global MAX_FIELD_BYTES: u32 = 124;
 
@@ -33,31 +29,6 @@ pub fn pack_to_4<let N: u32>(buf: [u8; N], off: u32, len: u32) -> [Field; 4] {
     }
 
     out
-}
-
-pub fn pack_alpha3(c: [u8; 3]) -> Field {
-    for i in 0..3 {
-        let ch = c[i];
-
-        assert(
-            ((ch >= 0x41) & (ch <= 0x5A)) | (ch == 0x3C),
-            "normalize: invalid country character",
-        );
-    }
-
-    (c[0] as Field) * 65536 + (c[1] as Field) * 256 + (c[2] as Field)
-}
-
-#[test]
-fn packs_alpha3() {
-    assert(pack_alpha3("VNM".as_bytes()) == 0x564E4D);
-
-    assert(pack_alpha3("UTO".as_bytes()) == 0x55544F);
-}
-
-#[test(should_fail_with = "normalize: invalid country character")]
-fn rejects_lowercase_country() {
-    let _ = pack_alpha3("vnm".as_bytes());
 }
 
 #[test]

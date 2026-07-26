@@ -170,11 +170,12 @@ pub fn dsc_commitment(dsc_pubkey_hash: Field, salt: Field) -> Field {
 
 // The session salt is the only hiding input in the commitment chain. Its
 // absence does not merely link sessions, it removes hiding entirely:
-// entropy_seed feeds every leaf, the root and the commitment, and for MRZ
-// profiles dg_hash is SHA-256 over DG1, which is the printed machine
-// readable zone wrapped in a TLV template. A party holding a photocopy of
-// the data page could recompute the holder's commitment for a domain and
-// test it against a registry. A zero salt is therefore rejected here; a
+// entropy_seed feeds every leaf, the root and the commitment, and a
+// profile's content hash is often taken over data printed on the credential
+// itself: in the machine readable zone profiles it is SHA-256 over DG1,
+// which is that printed zone wrapped in a TLV template. A party holding a
+// photocopy of the data page could then recompute the holder's commitment
+// for a domain and test it against a registry. A zero salt is therefore rejected here; a
 // persistent registry entry has to be built on a holder secret instead,
 // not on a degenerate salt.
 pub fn entropy_seed(dg_hash: [Field; 2], domain: Field, session_salt: Field) -> Field {

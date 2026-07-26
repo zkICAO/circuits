@@ -29,8 +29,6 @@ pub global TD1_ISSUING_STATE: u32 = 2;
 
 pub global TD1_DOC_NUMBER: u32 = 5;
 
-pub global TD1_OPTIONAL1: u32 = 15;
-
 pub global TD1_BIRTH_DATE: u32 = 30;
 
 pub global TD1_SEX: u32 = 37;

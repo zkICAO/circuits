@@ -6,5 +6,5 @@ compiler_version = ">=1.0.0"
 
 [dependencies]
 commit = { path = "../../core/commit" }
-policy = { path = "../../core/policy" }
+policy = { path = "../policy" }
 predicate = { path = "../../claims/predicate" }

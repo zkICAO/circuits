@@ -56,10 +56,10 @@ RSA is cheaper than the elliptic curve here, which is worth stating because it i
 ## Layout
 
 ```
-lib/core/     commit hash sig rsa x509 normalize policy   no ICAO knowledge
+lib/core/     commit hash sig rsa x509 normalize          no ICAO knowledge
 lib/emrtd/    cms lds sod dg_extract mrz attributes       Doc 9303 chip documents
 lib/trust/    anchor                                       the ICAO certificate chain
-lib/claims/   predicate nullifier                          statements about a commitment
+lib/claims/   predicate nullifier policy                   statements about a commitment
 lib/testdata/                                              generated fixtures
 
 bin/<phase>/<instantiation>/    one package per compiled circuit
@@ -68,6 +68,8 @@ fixtures/generator/             builds the documents the tests run against
 ```
 
 The project is named for ICAO rather than for one of its documents, and the grouping is where that shows. Doc 9303 is the first standard implemented and `lib/emrtd` is the part specific to it. A second ICAO credential family, a visible digital seal for instance, would add a sibling of `emrtd` and reuse `core`, `trust` and `claims` unchanged: a commitment, a certificate chain and a predicate do not care which document they came from.
+
+The rule that keeps this true is that `core` holds no knowledge of any standard. It packs bytes, hashes, verifies signatures and reads certificate fields; it does not know what a data group is, what a machine readable zone contains, or which country codes exist. Where a comment there names Doc 9303, it names it as the first instance of a general rule, never as the definition. `claims` is the same at the other end: a predicate opens a committed field and a nullifier scopes an identifier, and neither knows which standard produced the commitment.
 
 ## Naming
 
