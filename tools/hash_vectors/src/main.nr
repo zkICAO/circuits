@@ -12,7 +12,18 @@
 
 use poseidon::poseidon2::Poseidon2;
 
-fn main(a: Field, b: Field, c: Field, d: Field) -> pub [Field; 6] {
+// No inputs: the sample values are part of the vector definition, and a
+// witness file for them would be ignored by git and therefore absent
+// wherever the check actually runs.
+fn main() -> pub [Field; 6] {
+    let a = 1;
+
+    let b = 2;
+
+    let c = 3;
+
+    let d = 4;
+
     [
         Poseidon2::hash([a, b], 2),
         Poseidon2::hash([a, b, c], 3),

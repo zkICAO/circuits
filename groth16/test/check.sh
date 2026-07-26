@@ -37,7 +37,8 @@ if len(values) < 5:
 
 Path(sys.argv[2], 'noir.json').write_text(json.dumps([int(v, 16) for v in values[:5]]))
 
-Path(sys.argv[2], 'in.json').write_text(json.dumps({'a': '1', 'b': '2', 'c': '3', 'd': '4'}))
+# The circom side still takes them, since a circom main has inputs.
+    Path(sys.argv[2], 'in.json').write_text(json.dumps({'a': '1', 'b': '2', 'c': '3', 'd': '4'}))
 PYEOF
 
 circom "$here/test/vectors.circom" --wasm -o "$work" >/dev/null
