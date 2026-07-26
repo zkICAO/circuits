@@ -448,6 +448,136 @@ fn emit_rsa_document(body: &mut String, work_dir: &scratch::Scratch) {
     emit_limbs(body, "RSA_REDC_LIMBS", &key.redc_limbs());
 
     emit_limbs(body, "RSA_SIGNATURE_LIMBS", &signature);
+
+    emit_wide_rsa_document(body, work_dir);
+
+    emit_p384_document(body, work_dir);
+}
+
+/// The same document over P-384, the wider curve Doc 9303 permits. Its
+/// coordinates and signature components are 48 bytes rather than 32, so
+/// every buffer widens with the curve.
+fn emit_p384_document(body: &mut String, work_dir: &scratch::Scratch) {
+    let key = ec::generate(&ec::P384, &work_dir.join("dsc-p384.pem"));
+
+    let dg1 = icao::build_dg1(icao::MRZ_TD3);
+
+    let groups = vec![
+        icao::DataGroup {
+            number: 1,
+            content: dg1,
+        },
+        icao::DataGroup {
+            number: 2,
+            content: vec![0x5a; 96],
+        },
+    ];
+
+    let security_object = icao::build_security_object(&groups);
+
+    let signed_attrs = icao::build_signed_attributes(&security_object.econtent);
+
+    let signature = ec::sign_sha256(&key, &signed_attrs.bytes);
+
+    writeln!(
+        body,
+        "// The same TD3 document signed with a P-384 Document Signer key."
+    )
+    .unwrap();
+
+    emit_bytes(
+        body,
+        "P384_ECONTENT",
+        &security_object.econtent,
+        ECONTENT_BUFFER,
+    );
+
+    emit_u32(body, "P384_ECONTENT_LEN", security_object.econtent.len());
+
+    emit_bytes(
+        body,
+        "P384_SIGNED_ATTRS",
+        &signed_attrs.bytes,
+        SIGNED_ATTRS_BUFFER,
+    );
+
+    emit_u32(body, "P384_SIGNED_ATTRS_LEN", signed_attrs.bytes.len());
+
+    emit_u32(body, "P384_DIGEST_OFFSET", signed_attrs.digest_offset);
+
+    for (number, offset) in &security_object.dg_offsets {
+        emit_u32(body, &format!("P384_DG{number}_OFFSET"), *offset);
+    }
+
+    emit_bytes(body, "P384_DSC_PUBKEY_X", &key.public_x, 48);
+
+    emit_bytes(body, "P384_DSC_PUBKEY_Y", &key.public_y, 48);
+
+    emit_bytes(body, "P384_SIGNATURE_R", &signature.r, 48);
+
+    emit_bytes(body, "P384_SIGNATURE_S", &signature.s, 48);
+}
+
+/// The same document signed with a 4096 bit key. States do sign with wider
+/// keys than 2048, and every derived value widens with the modulus, so the
+/// fixture carries both rather than assuming one size fits.
+fn emit_wide_rsa_document(body: &mut String, work_dir: &scratch::Scratch) {
+    let key = rsa::generate_sized(&work_dir.join("dsc-rsa4096.pem"), rsa::RSA4096);
+
+    let dg1 = icao::build_dg1(icao::MRZ_TD3);
+
+    let groups = vec![
+        icao::DataGroup {
+            number: 1,
+            content: dg1,
+        },
+        icao::DataGroup {
+            number: 2,
+            content: vec![0x5a; 96],
+        },
+    ];
+
+    let security_object = icao::build_security_object(&groups);
+
+    let signed_attrs = icao::build_signed_attributes(&security_object.econtent);
+
+    let signature = rsa::sign_sha256(&key, &signed_attrs.bytes);
+
+    writeln!(
+        body,
+        "// The same TD3 document signed with an RSA-4096 Document Signer key."
+    )
+    .unwrap();
+
+    emit_bytes(
+        body,
+        "RSA4096_ECONTENT",
+        &security_object.econtent,
+        ECONTENT_BUFFER,
+    );
+
+    emit_u32(body, "RSA4096_ECONTENT_LEN", security_object.econtent.len());
+
+    emit_bytes(
+        body,
+        "RSA4096_SIGNED_ATTRS",
+        &signed_attrs.bytes,
+        SIGNED_ATTRS_BUFFER,
+    );
+
+    emit_u32(body, "RSA4096_SIGNED_ATTRS_LEN", signed_attrs.bytes.len());
+
+    emit_u32(body, "RSA4096_DIGEST_OFFSET", signed_attrs.digest_offset);
+
+    for (number, offset) in &security_object.dg_offsets {
+        emit_u32(body, &format!("RSA4096_DG{number}_OFFSET"), *offset);
+    }
+
+    emit_limbs(body, "RSA4096_MODULUS_LIMBS", &key.modulus_limbs());
+
+    emit_limbs(body, "RSA4096_REDC_LIMBS", &key.redc_limbs());
+
+    emit_limbs(body, "RSA4096_SIGNATURE_LIMBS", &signature);
 }
 
 /// A country signing key over a Document Signer certificate, which is the

@@ -1,0 +1,15 @@
+[package]
+name = "sod_rsa4096_v15_sha256_ec512"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+hash = { path = "../../../lib/core/hash" }
+commit = { path = "../../../lib/core/commit" }
+rsa = { path = "../../../lib/core/rsa" }
+sod = { path = "../../../lib/emrtd/sod" }
+# testdata is used only by the tests in this package. Nargo has no
+# dev-dependencies section, so this says it instead. No fixture value
+# reaches the compiled circuit; the bytecode is checked for that.
+testdata = { path = "../../../lib/testdata" }

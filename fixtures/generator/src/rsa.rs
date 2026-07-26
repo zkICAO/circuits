@@ -6,9 +6,26 @@ use std::path::Path;
 use crate::bigint::BigUint;
 use crate::ec::run;
 
-pub const MODULUS_BITS: usize = 2048;
+/// A modulus size the circuits are built for. Doc 9303 puts no upper bound
+/// on the key a state signs with, and 4096 bit country signing keys are in
+/// use, so the fixtures cover both sizes that have circuits.
+#[derive(Clone, Copy)]
+pub struct Size {
+    pub bits: usize,
+    pub limbs: usize,
+}
 
-pub const LIMBS: usize = 18;
+/// 2048 bits in 120 bit limbs: 18 of them, with the top one partly used.
+pub const RSA2048: Size = Size {
+    bits: 2048,
+    limbs: 18,
+};
+
+/// 4096 bits needs 35 limbs by the same arithmetic.
+pub const RSA4096: Size = Size {
+    bits: 4096,
+    limbs: 35,
+};
 
 // The backend divides by the modulus using floor(2^(2 * MOD_BITS + 6) / n).
 const BARRETT_OVERFLOW_BITS: usize = 6;
@@ -16,31 +33,38 @@ const BARRETT_OVERFLOW_BITS: usize = 6;
 pub struct RsaKey {
     pem_path: std::path::PathBuf,
     pub modulus: BigUint,
+    pub size: Size,
 }
 
 impl RsaKey {
     pub fn modulus_limbs(&self) -> Vec<u128> {
-        self.modulus.to_limbs_120(LIMBS)
+        self.modulus.to_limbs_120(self.size.limbs)
     }
 
     /// The reduction hint. A wrong value cannot make a bad signature verify,
     /// since the backend constrains multiplications against it, but a wrong
     /// value does make a good signature fail.
     pub fn redc_limbs(&self) -> Vec<u128> {
-        let numerator = BigUint::power_of_two(2 * MODULUS_BITS + BARRETT_OVERFLOW_BITS);
+        let numerator = BigUint::power_of_two(2 * self.size.bits + BARRETT_OVERFLOW_BITS);
 
-        numerator.divide(&self.modulus).to_limbs_120(LIMBS)
+        numerator
+            .divide(&self.modulus)
+            .to_limbs_120(self.size.limbs)
     }
 }
 
 pub fn generate(pem_path: &Path) -> RsaKey {
+    generate_sized(pem_path, RSA2048)
+}
+
+pub fn generate_sized(pem_path: &Path, size: Size) -> RsaKey {
     run(
         "openssl",
         &[
             "genrsa",
             "-out",
             pem_path.to_str().unwrap(),
-            &MODULUS_BITS.to_string(),
+            &size.bits.to_string(),
         ],
         None,
     );
@@ -77,15 +101,12 @@ pub fn generate(pem_path: &Path) -> RsaKey {
 
     let bytes = decode_hex(hex);
 
-    assert_eq!(
-        bytes.len() * 8,
-        MODULUS_BITS,
-        "rsa: unexpected modulus size"
-    );
+    assert_eq!(bytes.len() * 8, size.bits, "rsa: unexpected modulus size");
 
     RsaKey {
         pem_path: pem_path.to_path_buf(),
         modulus: BigUint::from_be_bytes(&bytes),
+        size,
     }
 }
 
@@ -98,11 +119,11 @@ pub fn sign_sha256(key: &RsaKey, message: &[u8]) -> Vec<u128> {
 
     assert_eq!(
         signature.len() * 8,
-        MODULUS_BITS,
+        key.size.bits,
         "rsa: signature is not the modulus width"
     );
 
-    BigUint::from_be_bytes(&signature).to_limbs_120(LIMBS)
+    BigUint::from_be_bytes(&signature).to_limbs_120(key.size.limbs)
 }
 
 fn decode_hex(text: &str) -> Vec<u8> {
@@ -137,18 +158,36 @@ mod tests {
 
         let key = generate(&dir.join("k.pem"));
 
-        assert_eq!(key.modulus_limbs().len(), LIMBS);
+        assert_eq!(key.modulus_limbs().len(), RSA2048.limbs);
 
-        assert_eq!(key.modulus.bit_length(), MODULUS_BITS);
+        assert_eq!(key.modulus.bit_length(), RSA2048.bits);
 
         // The reduction parameter is about 2^(2048 + 6) for a 2048 bit
         // modulus, so it must be wider than the modulus and fit the limbs.
         let redc = key.redc_limbs();
 
-        assert_eq!(redc.len(), LIMBS);
+        assert_eq!(redc.len(), RSA2048.limbs);
 
         let signature = sign_sha256(&key, b"zkICAO");
 
-        assert_eq!(signature.len(), LIMBS);
+        assert_eq!(signature.len(), RSA2048.limbs);
+    }
+
+    // The wider key is the one a state may sign with, and every derived
+    // value has to widen with it: the limbs, the reduction parameter and
+    // the signature.
+    #[test]
+    fn generates_a_four_thousand_ninety_six_bit_key() {
+        let dir = crate::scratch::Scratch::new("rsa4096-test");
+
+        let key = generate_sized(&dir.join("k.pem"), RSA4096);
+
+        assert_eq!(key.modulus.bit_length(), RSA4096.bits);
+
+        assert_eq!(key.modulus_limbs().len(), RSA4096.limbs);
+
+        assert_eq!(key.redc_limbs().len(), RSA4096.limbs);
+
+        assert_eq!(sign_sha256(&key, b"zkICAO").len(), RSA4096.limbs);
     }
 }
