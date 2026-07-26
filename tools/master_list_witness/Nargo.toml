@@ -1,0 +1,8 @@
+[package]
+name = "master_list_witness"
+type = "bin"
+authors = []
+compiler_version = ">=1.0.0"
+
+[dependencies]
+commit = { path = "../../lib/core/commit" }

@@ -12,8 +12,10 @@
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
+use crate::cert;
 use crate::ec;
 use crate::icao;
+use crate::rsa;
 use crate::scratch::Scratch;
 
 const ECONTENT_BUFFER: usize = 512;
@@ -310,6 +312,84 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         proving,
     );
 
+    // 6b. The whole chain instead of a curated set: a country signing key
+    //    certified this document's signer, checked in circuit. The
+    //    certificate is built over the same signer key and the commitment
+    //    uses the same salt, so it must land on the Passive Authentication
+    //    proof's dsc_commitment.
+    let authority = rsa::generate(&work.join("bundle-csca.pem"));
+
+    let certificate = cert::build_dsc_tbs(
+        &key.public_x,
+        &key.public_y,
+        "170101000000Z",
+        "301231235959Z",
+    );
+
+    let authority_signature = rsa::sign_sha256(&authority, &certificate.tbs);
+
+    let list_siblings: Vec<String> = (0..10).map(|level| (level + 800).to_string()).collect();
+
+    let mut witness = String::new();
+
+    limbs(&mut witness, "modulus_limbs", &authority.modulus_limbs());
+    array(&mut witness, "siblings", &list_siblings);
+
+    let master_list_root = run_circuit(circuits_root, "master_list_witness", &witness)[1].clone();
+
+    let mut witness = String::new();
+
+    bytes(&mut witness, "tbs", &certificate.tbs, 512);
+    value(&mut witness, "tbs_len", &certificate.tbs.len().to_string());
+    value(
+        &mut witness,
+        "public_key_offset",
+        &certificate.public_key_offset.to_string(),
+    );
+    value(
+        &mut witness,
+        "not_before_offset",
+        &certificate.not_before_offset.to_string(),
+    );
+    value(
+        &mut witness,
+        "not_after_offset",
+        &certificate.not_after_offset.to_string(),
+    );
+    limbs(
+        &mut witness,
+        "authority_modulus",
+        &authority.modulus_limbs(),
+    );
+    limbs(&mut witness, "authority_redc", &authority.redc_limbs());
+    limbs(&mut witness, "authority_signature", &authority_signature);
+    value(&mut witness, "authority_index", "0");
+    array(&mut witness, "authority_siblings", &list_siblings);
+    value(&mut witness, "salt", DSC_SALT);
+    value(&mut witness, "master_list_root", &master_list_root);
+    value(&mut witness, "current_yyyymmdd", TODAY);
+    value(&mut witness, "domain", DOMAIN);
+    value(&mut witness, "context", CONTEXT);
+
+    let chain = run_circuit(
+        circuits_root,
+        "anchor_csca_chain_rsa2048_sha256_tbs512",
+        &witness,
+    );
+
+    assert_eq!(
+        chain[0], dsc_commitment,
+        "the chain anchor must commit to the key that signed the document"
+    );
+
+    prove(
+        circuits_root,
+        out,
+        "anchor_csca_chain_rsa2048_sha256_tbs512",
+        "anchor_chain",
+        proving,
+    );
+
     // 7. One value per holder per application. It needs the secret that the
     //    Security Object proof published only a binding to.
     let mut witness = String::new();
@@ -417,6 +497,59 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
             out,
             "registration_mrz_td3_ecdsa_p256_sha256_ec512_inclusion",
             "registration",
+            proving,
+        );
+
+        // 8b. The registration that carries the whole chain: the anchor slot
+        //    holds the certificate check, and its date is the same witness
+        //    the attribute proof resolved against.
+        let mut witness = String::new();
+
+        for (prefix, name) in [
+            ("sod", "sod"),
+            ("dg_extract", "dg_extract"),
+            ("attributes", "attributes"),
+            ("anchor", "anchor_chain"),
+        ] {
+            field_elements(
+                &mut witness,
+                &format!("{prefix}_key"),
+                &out.join(name).join("vk"),
+            );
+
+            field_elements(
+                &mut witness,
+                &format!("{prefix}_proof"),
+                &out.join(name).join("proof"),
+            );
+        }
+
+        value(&mut witness, "econtent_binding", &econtent_binding);
+        value(&mut witness, "dsc_commitment", &dsc_commitment);
+        value(&mut witness, "secret_binding", &secret_binding);
+        value(&mut witness, "dg_binding", &dg_binding);
+        value(&mut witness, "commitment", &commitment);
+        value(&mut witness, "current_yyyymmdd", TODAY);
+        value(&mut witness, "master_list_root", &master_list_root);
+        value(&mut witness, "domain", DOMAIN);
+        value(&mut witness, "context", CONTEXT);
+
+        let chained = run_circuit(
+            circuits_root,
+            "registration_mrz_td3_ecdsa_p256_sha256_ec512_csca_chain",
+            &witness,
+        );
+
+        assert_eq!(
+            chained[3], master_list_root,
+            "the chained registration must expose the master list it anchored to"
+        );
+
+        prove(
+            circuits_root,
+            out,
+            "registration_mrz_td3_ecdsa_p256_sha256_ec512_csca_chain",
+            "registration_chain",
             proving,
         );
 
@@ -697,6 +830,13 @@ fn numeric(text: &str) -> u64 {
     } else {
         text.parse().expect("a numeric output does not parse")
     }
+}
+
+/// Writes u128 limbs the way the bignum witnesses take them.
+fn limbs(out: &mut String, name: &str, values: &[u128]) {
+    let rendered: Vec<String> = values.iter().map(|limb| limb.to_string()).collect();
+
+    array(out, name, &rendered);
 }
 
 fn bytes(out: &mut String, name: &str, value: &[u8], width: usize) {

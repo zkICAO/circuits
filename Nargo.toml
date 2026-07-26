@@ -32,9 +32,11 @@ members = [
     "bin/anchor/dsc_inclusion",
     "bin/anchor/csca_chain_rsa2048_sha256_tbs512",
     "bin/registration/mrz_td3_ecdsa_p256_sha256_ec512_inclusion",
+    "bin/registration/mrz_td3_ecdsa_p256_sha256_ec512_csca_chain",
     "bin/session/compare_member",
     "tools/mrz_opening",
     "tools/registry_witness",
     "tools/set_witness",
+    "tools/master_list_witness",
     "tools/document_secret",
 ]

@@ -14,7 +14,7 @@ use crate::scratch::Scratch;
 
 /// Each recursive circuit and the inner circuits it pins, in the order the
 /// constants are emitted into its keys.nr.
-const TARGETS: [(&str, &[(&str, &str)]); 2] = [
+const TARGETS: [(&str, &[(&str, &str)]); 3] = [
     (
         "bin/registration/mrz_td3_ecdsa_p256_sha256_ec512_inclusion/src/keys.nr",
         &[
@@ -22,6 +22,15 @@ const TARGETS: [(&str, &[(&str, &str)]); 2] = [
             ("DG_EXTRACT", "dg_extract_sha256_ec512"),
             ("ATTRIBUTES", "attributes_mrz_td3_sha256"),
             ("ANCHOR", "anchor_dsc_inclusion"),
+        ],
+    ),
+    (
+        "bin/registration/mrz_td3_ecdsa_p256_sha256_ec512_csca_chain/src/keys.nr",
+        &[
+            ("SOD", "sod_ecdsa_p256_sha256_ec512"),
+            ("DG_EXTRACT", "dg_extract_sha256_ec512"),
+            ("ATTRIBUTES", "attributes_mrz_td3_sha256"),
+            ("ANCHOR", "anchor_csca_chain_rsa2048_sha256_tbs512"),
         ],
     ),
     (
