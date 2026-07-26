@@ -1,11 +1,14 @@
 [package]
-name = "mrz"
-type = "lib"
+name = "attributes_mrz_td2_sha256"
+type = "bin"
 authors = []
 compiler_version = ">=1.0.0"
 
 [dependencies]
+attributes = { path = "../../../lib/emrtd/attributes" }
+commit = { path = "../../../lib/core/commit" }
+hash = { path = "../../../lib/core/hash" }
 # testdata is used only by the tests in this package. Nargo has no
 # dev-dependencies section, so this says it instead. No fixture value
 # reaches the compiled circuit; the bytecode is checked for that.
-testdata = { path = "../../testdata" }
+testdata = { path = "../../../lib/testdata" }

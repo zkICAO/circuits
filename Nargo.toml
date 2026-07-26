@@ -25,6 +25,7 @@ members = [
     "bin/dg_extract/sha256_ec1024",
     "bin/attributes/mrz_td3_sha256",
     "bin/attributes/mrz_td1_sha256",
+    "bin/attributes/mrz_td2_sha256",
     "bin/predicate/compare",
     "bin/predicate/member",
     "bin/predicate/reveal",

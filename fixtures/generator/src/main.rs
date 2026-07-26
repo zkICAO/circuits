@@ -128,6 +128,11 @@ fn main() {
             mrz_len: 88,
         },
         Document {
+            prefix: "TD2",
+            mrz: icao::MRZ_TD2,
+            mrz_len: 72,
+        },
+        Document {
             prefix: "TD1",
             mrz: icao::MRZ_TD1,
             mrz_len: 90,

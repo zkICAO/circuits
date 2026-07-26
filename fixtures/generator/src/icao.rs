@@ -23,6 +23,12 @@ pub const TAG_MRZ_DATA: &[u8] = &[0x5f, 0x1f];
 pub const MRZ_TD3: &str =
     "P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<L898902C36UTO7408122F1204159ZE184226B<<<<<10";
 
+/// The card sized travel document layout, two lines of thirty six, built
+/// from the same specimen holder as the other two with check digits computed
+/// under the 7-3-1 weighting.
+pub const MRZ_TD2: &str =
+    "I<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<D231458907UTO7408122F1204159<<<<<<<6";
+
 pub const MRZ_TD1: &str =
     "I<UTOD231458907<<<<<<<<<<<<<<<7408122F1204159UTO<<<<<<<<<<<6ERIKSSON<<ANNA<MARIA<<<<<<<<<<";
 

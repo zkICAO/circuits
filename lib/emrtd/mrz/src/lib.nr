@@ -25,6 +25,24 @@ pub global TD3_EXPIRY_DATE: u32 = 65;
 
 pub global TD3_OPTIONAL: u32 = 72;
 
+pub global TD2_MRZ_BYTES: u32 = 72;
+
+pub global TD2_ISSUING_STATE: u32 = 2;
+
+pub global TD2_NAME: u32 = 5;
+
+pub global TD2_DOC_NUMBER: u32 = 36;
+
+pub global TD2_NATIONALITY: u32 = 46;
+
+pub global TD2_BIRTH_DATE: u32 = 49;
+
+pub global TD2_SEX: u32 = 56;
+
+pub global TD2_EXPIRY_DATE: u32 = 57;
+
+pub global TD2_OPTIONAL: u32 = 64;
+
 pub global TD1_ISSUING_STATE: u32 = 2;
 
 pub global TD1_DOC_NUMBER: u32 = 5;
@@ -118,6 +136,43 @@ pub fn td3_validate(mrz: [u8; 88]) {
     }
 
     assert(check_digit(comp) == mrz[87], "mrz: td3 composite check digit");
+}
+
+// TD2 is two lines of thirty six, the size between the card and the
+// passport. The upper line carries the document code, the issuing state and
+// the name; the lower carries the document number, nationality, dates, sex,
+// optional data and a composite check digit over the lower line's own
+// fields, which is the shape TD3 uses rather than TD1's across both lines.
+pub fn td2_validate(mrz: [u8; 72]) {
+    let doc: [u8; 9] = copy(mrz, TD2_DOC_NUMBER);
+
+    assert(check_digit_ok(doc, mrz[45], true), "mrz: td2 document number check digit");
+
+    let dob: [u8; 6] = copy(mrz, TD2_BIRTH_DATE);
+
+    assert(check_digit_ok(dob, mrz[55], false), "mrz: td2 birth date check digit");
+
+    let exp: [u8; 6] = copy(mrz, TD2_EXPIRY_DATE);
+
+    assert(check_digit_ok(exp, mrz[63], false), "mrz: td2 expiry date check digit");
+
+    // The composite runs from the document number through the optional
+    // data: positions 36 to 45, 49 to 55 and 57 to 70 of the flat form.
+    let mut comp: [u8; 31] = [0; 31];
+
+    for i in 0..10 {
+        comp[i] = mrz[36 + i];
+    }
+
+    for i in 0..7 {
+        comp[10 + i] = mrz[49 + i];
+    }
+
+    for i in 0..14 {
+        comp[17 + i] = mrz[57 + i];
+    }
+
+    assert(check_digit(comp) == mrz[71], "mrz: td2 composite check digit");
 }
 
 pub fn td1_validate(mrz: [u8; 90]) {
@@ -371,4 +426,43 @@ fn a_prover_chosen_date_moves_a_minor_past_an_adult_check() {
     assert(chosen == 19100101, "the century moved");
 
     assert(chosen <= adult_cutoff, "and the minor now passes the adult check");
+}
+
+#[test]
+fn accepts_the_generated_td2_specimen() {
+    let mut mrz: [u8; 72] = [0; 72];
+
+    for i in 0..72 {
+        mrz[i] = testdata::TD2_MRZ[i];
+    }
+
+    td2_validate(mrz);
+}
+
+// The composite runs over the lower line only, so a change there has to be
+// caught even when every individual check digit still matches.
+#[test(should_fail_with = "mrz: td2 document number check digit")]
+fn rejects_a_tampered_td2_document_number() {
+    let mut mrz: [u8; 72] = [0; 72];
+
+    for i in 0..72 {
+        mrz[i] = testdata::TD2_MRZ[i];
+    }
+
+    mrz[TD2_DOC_NUMBER] = 0x42;
+
+    td2_validate(mrz);
+}
+
+#[test(should_fail_with = "mrz: td2 composite check digit")]
+fn rejects_a_tampered_td2_composite() {
+    let mut mrz: [u8; 72] = [0; 72];
+
+    for i in 0..72 {
+        mrz[i] = testdata::TD2_MRZ[i];
+    }
+
+    mrz[71] = mrz[71] + 1;
+
+    td2_validate(mrz);
 }

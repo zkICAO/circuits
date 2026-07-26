@@ -279,6 +279,143 @@ fn td3_parse<let N: u32>(
 }
 
 /// TD1 is the card layout: three lines of 30 characters.
+/// The card sized travel document layout, two lines of thirty six. It
+/// commits the same nine fields under the same identifiers as the other two
+/// profiles, so a predicate written against one works against all three; the
+/// widths differ because the lines do.
+pub fn td2<let N: u32>(
+    dg1: [u8; N],
+    dg1_len: u32,
+    expected_dg_binding: Field,
+    current_yyyymmdd: u32,
+    session_salt: Field,
+    domain: Field,
+) -> Attributes {
+    let parsed = td2_parse(dg1, dg1_len, current_yyyymmdd, session_salt, domain);
+
+    assert(
+        parsed.binding == expected_dg_binding,
+        "attributes: data group was not the authenticated one",
+    );
+
+    Attributes {
+        dg_binding: parsed.binding,
+        commitment: build_commitment(parsed.values, parsed.seed, domain),
+        birth_date: parsed.birth_date,
+        expiry_date: parsed.expiry_date,
+    }
+}
+
+/// The opening for one field of a passport, for the witness tool. It runs the
+/// same parse, so an opening cannot describe a field differently from the way
+/// the commitment committed to it.
+pub fn td2_opening<let N: u32>(
+    dg1: [u8; N],
+    dg1_len: u32,
+    current_yyyymmdd: u32,
+    session_salt: Field,
+    domain: Field,
+    field_id: u32,
+) -> commit::FieldOpening {
+    let parsed = td2_parse(dg1, dg1_len, current_yyyymmdd, session_salt, domain);
+
+    build_opening(parsed.values, parsed.seed, field_id)
+}
+
+fn td2_parse<let N: u32>(
+    dg1: [u8; N],
+    dg1_len: u32,
+    current_yyyymmdd: u32,
+    session_salt: Field,
+    domain: Field,
+) -> Parsed {
+    check_dg1_template(dg1, dg1_len, mrz::TD2_MRZ_BYTES);
+
+    let dg_hash = sha256_bounded(dg1, dg1_len);
+
+    let dg_hash_fields = hash32_to_fields(dg_hash);
+
+    let binding = dg_binding(dg_hash_fields, domain);
+
+    let mut characters: [u8; 72] = [0; 72];
+
+    for i in 0..mrz::TD2_MRZ_BYTES {
+        characters[i] = dg1[DG1_MRZ_OFFSET + i];
+    }
+
+    mrz::td2_validate(characters);
+
+    let birth_date =
+        mrz::birth_date_to_int(mrz::copy(characters, mrz::TD2_BIRTH_DATE), current_yyyymmdd);
+
+    let expiry_date = mrz::expiry_date_to_int(mrz::copy(characters, mrz::TD2_EXPIRY_DATE));
+
+    let mut values: [FieldValue; 16] = [empty_field(0); 16];
+
+    for i in 0..FIELD_COUNT {
+        values[i] = empty_field(i + 1);
+    }
+
+    values[FIELD_DOCUMENT_CODE - 1] = FieldValue {
+        id: FIELD_DOCUMENT_CODE,
+        length: 2,
+        data: normalize::pack_to_4(characters, 0, 2),
+    };
+
+    values[FIELD_ISSUING_STATE - 1] = FieldValue {
+        id: FIELD_ISSUING_STATE,
+        length: 3,
+        data: normalize::pack_to_4(characters, mrz::TD2_ISSUING_STATE, 3),
+    };
+
+    values[FIELD_DOCUMENT_NUMBER - 1] = FieldValue {
+        id: FIELD_DOCUMENT_NUMBER,
+        length: 9,
+        data: normalize::pack_to_4(characters, mrz::TD2_DOC_NUMBER, 9),
+    };
+
+    values[FIELD_NATIONALITY - 1] = FieldValue {
+        id: FIELD_NATIONALITY,
+        length: 3,
+        data: normalize::pack_to_4(characters, mrz::TD2_NATIONALITY, 3),
+    };
+
+    values[FIELD_BIRTH_DATE - 1] =
+        FieldValue { id: FIELD_BIRTH_DATE, length: 8, data: [birth_date as Field, 0, 0, 0] };
+
+    values[FIELD_SEX - 1] = FieldValue {
+        id: FIELD_SEX,
+        length: 1,
+        data: normalize::pack_to_4(characters, mrz::TD2_SEX, 1),
+    };
+
+    values[FIELD_EXPIRY_DATE - 1] =
+        FieldValue { id: FIELD_EXPIRY_DATE, length: 8, data: [expiry_date as Field, 0, 0, 0] };
+
+    values[FIELD_NAME - 1] = FieldValue {
+        id: FIELD_NAME,
+        length: 31,
+        data: normalize::pack_to_4(characters, mrz::TD2_NAME, 31),
+    };
+
+    values[FIELD_OPTIONAL_DATA - 1] = FieldValue {
+        id: FIELD_OPTIONAL_DATA,
+        length: 7,
+        data: normalize::pack_to_4(characters, mrz::TD2_OPTIONAL, 7),
+    };
+
+    Parsed {
+        values,
+        seed: entropy_seed(dg_hash_fields, domain, session_salt),
+        binding,
+        birth_date,
+        expiry_date,
+    }
+}
+
+/// TD1 is the card layout: three lines of 30 characters.
+/// The card layout, three lines of thirty. It commits the same nine fields
+/// under the same identifiers as the other two profiles.
 pub fn td1<let N: u32>(
     dg1: [u8; N],
     dg1_len: u32,
@@ -287,6 +424,44 @@ pub fn td1<let N: u32>(
     session_salt: Field,
     domain: Field,
 ) -> Attributes {
+    let parsed = td1_parse(dg1, dg1_len, current_yyyymmdd, session_salt, domain);
+
+    assert(
+        parsed.binding == expected_dg_binding,
+        "attributes: data group was not the authenticated one",
+    );
+
+    Attributes {
+        dg_binding: parsed.binding,
+        commitment: build_commitment(parsed.values, parsed.seed, domain),
+        birth_date: parsed.birth_date,
+        expiry_date: parsed.expiry_date,
+    }
+}
+
+/// The opening for one field of a card, for the witness tool. It runs the
+/// same parse, so an opening cannot describe a field differently from the way
+/// the commitment committed to it.
+pub fn td1_opening<let N: u32>(
+    dg1: [u8; N],
+    dg1_len: u32,
+    current_yyyymmdd: u32,
+    session_salt: Field,
+    domain: Field,
+    field_id: u32,
+) -> commit::FieldOpening {
+    let parsed = td1_parse(dg1, dg1_len, current_yyyymmdd, session_salt, domain);
+
+    build_opening(parsed.values, parsed.seed, field_id)
+}
+
+fn td1_parse<let N: u32>(
+    dg1: [u8; N],
+    dg1_len: u32,
+    current_yyyymmdd: u32,
+    session_salt: Field,
+    domain: Field,
+) -> Parsed {
     check_dg1_template(dg1, dg1_len, mrz::TD1_MRZ_BYTES);
 
     let dg_hash = sha256_bounded(dg1, dg1_len);
@@ -294,8 +469,6 @@ pub fn td1<let N: u32>(
     let dg_hash_fields = hash32_to_fields(dg_hash);
 
     let binding = dg_binding(dg_hash_fields, domain);
-
-    assert(binding == expected_dg_binding, "attributes: data group was not the authenticated one");
 
     let mut characters: [u8; 90] = [0; 90];
 
@@ -368,9 +541,10 @@ pub fn td1<let N: u32>(
 
     let seed = entropy_seed(dg_hash_fields, domain, session_salt);
 
-    Attributes {
-        dg_binding: binding,
-        commitment: build_commitment(values, seed, domain),
+    Parsed {
+        values,
+        seed: entropy_seed(dg_hash_fields, domain, session_salt),
+        binding,
         birth_date,
         expiry_date,
     }
@@ -519,6 +693,32 @@ fn refuses_an_opening_for_a_field_that_does_not_exist() {
     );
 }
 
+// One layout read as another must fail. DG1 carries its own length, so the
+// template check is what catches it before any field is committed.
+#[test(should_fail)]
+fn a_card_is_not_a_passport() {
+    let _ = td3(
+        testdata::TD2_DG1,
+        testdata::TD2_DG1_LEN,
+        td2_expected_binding(42),
+        20260725,
+        123456789,
+        42,
+    );
+}
+
+#[test(should_fail)]
+fn a_passport_is_not_a_card() {
+    let _ = td2(
+        testdata::TD3_DG1,
+        testdata::TD3_DG1_LEN,
+        td3_expected_binding(42),
+        20260725,
+        123456789,
+        42,
+    );
+}
+
 // Helpers for the tests above. They read the generated fixtures, which is
 // why this package depends on testdata at all, and they sit here so that
 // every fixture reference in the file is below the first test.
@@ -535,4 +735,10 @@ fn td1_expected_binding(domain: Field) -> Field {
         hash32_to_fields(sha256_bounded(testdata::TD1_DG1, testdata::TD1_DG1_LEN)),
         domain,
     )
+}
+
+fn td2_expected_binding(domain: Field) -> Field {
+    let dg_hash = sha256_bounded(testdata::TD2_DG1, testdata::TD2_DG1_LEN);
+
+    dg_binding(hash32_to_fields(dg_hash), domain)
 }

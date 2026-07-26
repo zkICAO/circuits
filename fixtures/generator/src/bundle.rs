@@ -664,6 +664,8 @@ fn opening_for(circuits_root: &Path, dg1: &[u8], field_id: &str) -> Vec<String> 
     value(&mut witness, "domain", DOMAIN);
     value(&mut witness, "current_yyyymmdd", TODAY);
     value(&mut witness, "field_id", field_id);
+    // The bundle proves a passport; a card would name its own layout here.
+    value(&mut witness, "layout", "3");
 
     let opening = run_circuit(circuits_root, "mrz_opening", &witness);
 

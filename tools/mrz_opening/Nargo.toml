@@ -10,3 +10,6 @@ commit = { path = "../../lib/core/commit" }
 hash = { path = "../../lib/core/hash" }
 mrz = { path = "../../lib/emrtd/mrz" }
 normalize = { path = "../../lib/core/normalize" }
+# testdata is used only by the tests in this package. Nargo has no
+# dev-dependencies section, so this says it instead.
+testdata = { path = "../../lib/testdata" }
