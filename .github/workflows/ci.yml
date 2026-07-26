@@ -66,3 +66,50 @@ jobs:
 
       - name: Generator lint
         run: cargo clippy --manifest-path fixtures/generator/Cargo.toml --all-targets -- -D warnings
+
+  # The second proving stack, in its own job so that building a C++ prover
+  # does not sit in front of every other check. What it protects is the one
+  # property that cannot be inferred: that circom computes the Poseidon2 the
+  # Noir circuits compute, and that a predicate here opens a commitment they
+  # made. Matching constants are a reason to expect that, not evidence of it.
+  groth16:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install noirup
+        run: |
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
+          echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
+
+      - name: Pin nargo
+        run: noirup -v 1.0.0-beta.19
+
+      - name: Install circom
+        run: |
+          cargo install --locked --git https://github.com/iden3/circom.git --tag v2.2.3 circom
+
+      - name: Install snarkjs
+        run: npm install -g snarkjs@0.7.5
+
+      # The witness the agreement check opens is one the Noir circuits made,
+      # so the chain has to run first. Proving is left out; the check needs
+      # the openings, not the proofs.
+      - name: Produce a bundle to check against
+        run: cargo run --manifest-path fixtures/generator/Cargo.toml -- bundle --no-prove
+
+      - name: The two stacks agree
+        run: ./groth16/test/check.sh
+
+      # Witness generation in Rust, which is the path a device takes. The
+      # prover half needs rapidsnark built for the host and is exercised
+      # locally; this is the half with no native dependency.
+      - name: Witness generation builds and lints
+        run: |
+          cargo clippy --manifest-path groth16/prover/Cargo.toml --all-targets -- -D warnings
+
+          cargo test --manifest-path groth16/prover/Cargo.toml
