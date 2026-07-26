@@ -136,10 +136,11 @@ pub fn limbs_document_secret<let N: u32>(limbs: [u128; N]) -> Field {
     fold_limbs(TAG_DOCUMENT_SECRET, limbs)
 }
 
-/// Material that identifies one document and that only a party who read its
-/// chip can produce. The signature over the Security Object serves: it is
-/// fixed at issuance, so a prover cannot choose it, and it is not printed on
-/// the data page, so it cannot be guessed from a photocopy.
+/// Material that identifies one credential and that only a party who read
+/// it can produce. The issuer's signature over the credential serves, in Doc
+/// 9303 the signature over the Security Object: it is fixed at issuance, so
+/// a prover cannot choose it, and it is not printed on the data page, so it
+/// cannot be guessed from a photocopy.
 ///
 /// It does not survive reissue. A replacement document carries a different
 /// signature and therefore a different secret, which is why a policy that
