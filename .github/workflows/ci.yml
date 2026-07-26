@@ -105,9 +105,14 @@ jobs:
       - name: The two stacks agree
         run: ./groth16/test/check.sh
 
+      # circom-witnesscalc reads the circuit graph through a generated
+      # protobuf, so its build script needs the compiler.
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
       # Witness generation in Rust, which is the path a device takes. The
       # prover half needs rapidsnark built for the host and is exercised
-      # locally; this is the half with no native dependency.
+      # locally; this is the half with no other native dependency.
       - name: Witness generation builds and lints
         run: |
           cargo clippy --manifest-path groth16/prover/Cargo.toml --all-targets -- -D warnings
