@@ -21,7 +21,7 @@ sod                                        did the signer sign this document
 
 Proofs are linked by equalities between their public values, not by trust in any one of them. The off-chain verifier in [zkICAO/prover](https://github.com/zkICAO/prover) enforces that checklist so an integration does not carry its own copy.
 
-A registration circuit verifies the anchor, sod, dg-extract and attributes proofs recursively and publishes their linked outputs, so a relying party can take one proof where the equalities hold by construction instead of four proofs and a checklist. The inner verification key hashes are compiled in, from a generated `keys.nr` written by `cargo run -- keys`. The predicates and the nullifier stay separate, because a document registers once and gets asked questions per session. One property of the backend matters when integrating: producing a proof does not check the witness, so a registration proof over a forged inner proof is produced without complaint and rejected when verified. Verification is the only outcome that means anything.
+A registration circuit verifies the anchor, sod, dg-extract and attributes proofs recursively and publishes their linked outputs, so a relying party can take one proof where the equalities hold by construction instead of four proofs and a checklist. Two variants exist: one over the signer registry, one that walks the chain to the country signing key with its validity date tied to the attribute date by a shared witness. The inner verification key hashes are compiled in, from a generated `keys.nr` written by `cargo run -- keys`. The predicates and the nullifier stay separate, because a document registers once and gets asked questions per session; a session that asks more than one question aggregates its predicates the same way, `session/compare_member` being the first pair. One property of the backend matters when integrating: producing a proof does not check the witness, so a registration proof over a forged inner proof is produced without complaint and rejected when verified. Verification is the only outcome that means anything.
 
 Doc 9303 makes DG1 (the machine readable zone) mandatory on every compliant document, so profiles that read DG1 are what keep the core portable across issuing states. Data groups an individual state defines, such as DG13, are opt-in enrichment and are not implemented.
 
@@ -46,6 +46,8 @@ Measured with `nargo info`, ACIR opcodes:
 | `predicate/reveal` | 100 | a field, disclosed verbatim |
 | `nullifier/document_number` | 58 | scoped uniqueness for one document |
 | `registration/mrz_td3_ecdsa_p256_sha256_ec512_inclusion` | 17 | the four document proofs, verified recursively as one |
+| `registration/mrz_td3_ecdsa_p256_sha256_ec512_csca_chain` | 17 | the same, with the country signing chain checked in circuit |
+| `session/compare_member` | 9 | two predicates of a session, verified recursively as one |
 
 The Security Object signature dominates and runs once. Everything a verifier actually asks about costs two or three orders of magnitude less, which is why the signature check and the data group extraction are separate circuits rather than one.
 
@@ -82,6 +84,7 @@ A circuit is `bin/<phase>/<instantiation>`, and its package is `<phase>_<instant
 | `predicate` | the statement | `compare` |
 | `nullifier` | the policy | `document_number` |
 | `registration` | the aggregated variant set | `mrz_td3_ecdsa_p256_sha256_ec512_inclusion` |
+| `session` | the aggregated question pair | `compare_member` |
 
 Underscores rather than hyphens throughout: Nargo rejects a package name containing a hyphen.
 
@@ -110,8 +113,13 @@ The off-chain verifier consumes the result. It returns what a bundle proved, not
 - Chip authentication of any kind, so a cloned chip carrying genuine data is not detected
 - TD2, which Doc 9303 defines alongside TD1 and TD3
 - Digest algorithms other than SHA-256, and signature algorithms beyond the variants listed above
-- Any on-chain verifier: the registration proof is what such a deployment would verify, and no contract exists
+- Deployment and audit: the reference on chain registry in [zkICAO/contracts](https://github.com/zkICAO/contracts) verifies real proofs under test and is deployed nowhere
+- Session question compositions beyond the compare and member pair, and any on chain session questions
 - Nullifier policies that survive document reissue, which need a secret that is not chip bound
+
+## What is fixed and what is yours
+
+zkICAO is infrastructure, so the boundary matters. Fixed by the protocol: the hash tags and derived value formats in `lib/core/commit`, the policy identifiers, the tree depths, the public input layouts. Functions of the toolchain, regenerated rather than configured: every verification key, the `keys.nr` hashes the recursive circuits compile in (`cargo run -- keys`), and the Solidity verifiers (`bb write_solidity_verifier`); never edit these by hand. Chosen by each application: its `domain`, its accepted verification keys, its one nullifier policy, the registry or master list it trusts as a root it builds itself, its date window, a fresh `context` per exchange. Kept by the holder and never sent: the session salt behind a registered commitment, the DSC salt, the document secret. No repository commits private key material; every fixture document is synthetic.
 
 ## Toolchain
 
