@@ -1,0 +1,13 @@
+# Build artifacts, all reproducible from the sources here.
+build/
+test/*.r1cs
+test/*.sym
+test/*_js/
+test/*_cpp/
+
+# A phase 2 proving key must never be committed. Whoever holds the entropy
+# of a contribution can forge proofs for that circuit, so a key from a
+# single local contribution is fit for development and nothing else. A
+# deployment runs its own ceremony.
+*.zkey
+*.ptau
