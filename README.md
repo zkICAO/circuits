@@ -63,7 +63,8 @@ lib/claims/   predicate nullifier policy                   statements about a co
 lib/testdata/                                              generated fixtures
 
 bin/<phase>/<instantiation>/    one package per compiled circuit
-tools/                          executed to solve a witness, never proved
+tools/                          executed to solve a witness, never proved: openings,
+                                leaves, and the trees a verifier publishes
 fixtures/generator/             builds the documents the tests run against
 ```
 
@@ -97,6 +98,12 @@ A circuit pays for its buffer, not for the actual document length, which is why 
 A Security Object holds one entry per data group, 39 bytes each with SHA-256 hashes. Twelve data groups fit 512 bytes and thirteen do not, and Doc 9303 allows sixteen, so a document carrying more than twelve needs the 1024 byte variant. Larger digests move the line further: with SHA-512 entries only six fit 512 bytes.
 
 Doubling the buffer costs 2936 ACIR opcodes in every variant, which is the extra hashing and nothing else. Against the 35098 of an elliptic curve signature check that is eight percent; against a data group extraction it is most of the circuit.
+
+## The trees a verifier publishes
+
+Three trees carry the values a verifier decides for itself: a signer registry at depth sixteen, a master list at depth ten, and a membership set at depth eight. It builds them with the tools rather than reimplementing the hashing, and publishes only the roots.
+
+A tree of a few hundred entries at depth sixteen is mostly empty, so padding is part of the format: an absent leaf is zero and every level above is that level's empty root paired with itself. It is a convention rather than a caller's choice, because a published root and a circuit walking a path to it are comparable only if both padded the same way. `tools/merkle_path` implements it, tested at every index at all three depths against the same path walk the circuits use.
 
 ## Fixtures
 
