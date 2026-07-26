@@ -24,9 +24,18 @@ const SIGNED_ATTRS_BUFFER: usize = 256;
 
 const DG1_BUFFER: usize = 128;
 
-const DOMAIN: &str = "42";
+/// The application scope and the session freshness value. Both belong to
+/// the verifier rather than to this generator, so both can be given. A run
+/// that proves against a chain sets the context to the address that will
+/// send the transaction, since the registry contract takes the sender as the
+/// context; a run that only checks the chain links leaves the defaults.
+fn domain() -> String {
+    std::env::var("ZKICAO_DOMAIN").unwrap_or_else(|_| "42".to_string())
+}
 
-const CONTEXT: &str = "99";
+fn context() -> String {
+    std::env::var("ZKICAO_CONTEXT").unwrap_or_else(|_| "99".to_string())
+}
 
 const DSC_SALT: &str = "7";
 
@@ -140,8 +149,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     bytes(&mut witness, "signature_r", &signature.r, 32);
     bytes(&mut witness, "signature_s", &signature.s, 32);
     value(&mut witness, "dsc_salt", DSC_SALT);
-    value(&mut witness, "domain", DOMAIN);
-    value(&mut witness, "context", CONTEXT);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
 
     let sod = run_circuit(circuits_root, "sod_ecdsa_p256_sha256_ec512", &witness);
 
@@ -181,8 +190,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     value(&mut witness, "dg_offset", &dg1_offset.to_string());
     value(&mut witness, "dg_number", "1");
     value(&mut witness, "econtent_binding", &econtent_binding);
-    value(&mut witness, "domain", DOMAIN);
-    value(&mut witness, "context", CONTEXT);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
 
     let dg_binding = run_circuit(circuits_root, "dg_extract_sha256_ec512", &witness)[0].clone();
 
@@ -202,8 +211,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     value(&mut witness, "session_salt", SESSION_SALT);
     value(&mut witness, "dg_binding", &dg_binding);
     value(&mut witness, "current_yyyymmdd", TODAY);
-    value(&mut witness, "domain", DOMAIN);
-    value(&mut witness, "context", CONTEXT);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
 
     let commitment = run_circuit(circuits_root, "attributes_mrz_td3_sha256", &witness)[0].clone();
 
@@ -229,8 +238,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     value(&mut witness, "commitment", &commitment);
     value(&mut witness, "minimum", "0");
     value(&mut witness, "maximum", "20080725");
-    value(&mut witness, "domain", DOMAIN);
-    value(&mut witness, "context", CONTEXT);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
 
     run_circuit(circuits_root, "predicate_compare", &witness);
 
@@ -283,8 +292,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     value(&mut witness, "field_id", NATIONALITY_FIELD);
     value(&mut witness, "commitment", &commitment);
     value(&mut witness, "set_root", &set_root);
-    value(&mut witness, "domain", DOMAIN);
-    value(&mut witness, "context", CONTEXT);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
 
     run_circuit(circuits_root, "predicate_member", &witness);
 
@@ -331,8 +340,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     value(&mut witness, "index", &registry_index.to_string());
     array(&mut witness, "siblings", &siblings);
     value(&mut witness, "registry_root", &registry_root);
-    value(&mut witness, "domain", DOMAIN);
-    value(&mut witness, "context", CONTEXT);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
 
     let anchor = run_circuit(circuits_root, "anchor_dsc_inclusion", &witness);
 
@@ -408,8 +417,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     value(&mut witness, "salt", DSC_SALT);
     value(&mut witness, "master_list_root", &master_list_root);
     value(&mut witness, "current_yyyymmdd", TODAY);
-    value(&mut witness, "domain", DOMAIN);
-    value(&mut witness, "context", CONTEXT);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
 
     let chain = run_circuit(
         circuits_root,
@@ -456,8 +465,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
     value(&mut witness, "secret", &secret);
     value(&mut witness, "commitment", &commitment);
     value(&mut witness, "secret_binding", &secret_binding);
-    value(&mut witness, "domain", DOMAIN);
-    value(&mut witness, "context", CONTEXT);
+    value(&mut witness, "domain", &domain());
+    value(&mut witness, "context", &context());
 
     let nullifier = run_circuit(circuits_root, "nullifier_document_number", &witness)[0].clone();
 
@@ -502,8 +511,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         value(&mut witness, "commitment", &commitment);
         value(&mut witness, "current_yyyymmdd", TODAY);
         value(&mut witness, "registry_root", &registry_root);
-        value(&mut witness, "domain", DOMAIN);
-        value(&mut witness, "context", CONTEXT);
+        value(&mut witness, "domain", &domain());
+        value(&mut witness, "context", &context());
 
         let registration = run_circuit(
             circuits_root,
@@ -571,8 +580,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         value(&mut witness, "commitment", &commitment);
         value(&mut witness, "current_yyyymmdd", TODAY);
         value(&mut witness, "master_list_root", &master_list_root);
-        value(&mut witness, "domain", DOMAIN);
-        value(&mut witness, "context", CONTEXT);
+        value(&mut witness, "domain", &domain());
+        value(&mut witness, "context", &context());
 
         let chained = run_circuit(
             circuits_root,
@@ -623,8 +632,8 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         value(&mut witness, "maximum", "20080725");
         value(&mut witness, "member_field_id", NATIONALITY_FIELD);
         value(&mut witness, "set_root", &set_root);
-        value(&mut witness, "domain", DOMAIN);
-        value(&mut witness, "context", CONTEXT);
+        value(&mut witness, "domain", &domain());
+        value(&mut witness, "context", &context());
 
         let session = run_circuit(circuits_root, "session_compare_member", &witness);
 
@@ -661,7 +670,7 @@ fn opening_for(circuits_root: &Path, dg1: &[u8], field_id: &str) -> Vec<String> 
     bytes(&mut witness, "dg1", dg1, DG1_BUFFER);
     value(&mut witness, "dg1_len", &dg1.len().to_string());
     value(&mut witness, "session_salt", SESSION_SALT);
-    value(&mut witness, "domain", DOMAIN);
+    value(&mut witness, "domain", &domain());
     value(&mut witness, "current_yyyymmdd", TODAY);
     value(&mut witness, "field_id", field_id);
     // The bundle proves a passport; a card would name its own layout here.
