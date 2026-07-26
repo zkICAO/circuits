@@ -34,12 +34,6 @@ pub fn extract_sha256<let EC: u32>(
     dg_binding(hash32_to_fields(dg_hash), domain)
 }
 
-fn td3_binding(domain: Field) -> Field {
-    let econtent_hash = sha256_bounded(testdata::TD3_ECONTENT, testdata::TD3_ECONTENT_LEN);
-
-    econtent_binding(hash32_to_fields(econtent_hash), domain)
-}
-
 #[test]
 fn extracts_two_data_groups_from_one_security_object() {
     let domain = 42;
@@ -123,4 +117,14 @@ fn rejects_reading_an_entry_as_the_wrong_data_group() {
         td3_binding(domain),
         domain,
     );
+}
+
+// Helpers for the tests above. They read the generated fixtures, which is
+// why this package depends on testdata at all, and they sit here so that
+// every fixture reference in the file is below the first test.
+
+fn td3_binding(domain: Field) -> Field {
+    let econtent_hash = sha256_bounded(testdata::TD3_ECONTENT, testdata::TD3_ECONTENT_LEN);
+
+    econtent_binding(hash32_to_fields(econtent_hash), domain)
 }

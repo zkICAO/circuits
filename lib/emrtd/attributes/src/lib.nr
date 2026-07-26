@@ -376,20 +376,6 @@ pub fn td1<let N: u32>(
     }
 }
 
-fn td3_expected_binding(domain: Field) -> Field {
-    dg_binding(
-        hash32_to_fields(sha256_bounded(testdata::TD3_DG1, testdata::TD3_DG1_LEN)),
-        domain,
-    )
-}
-
-fn td1_expected_binding(domain: Field) -> Field {
-    dg_binding(
-        hash32_to_fields(sha256_bounded(testdata::TD1_DG1, testdata::TD1_DG1_LEN)),
-        domain,
-    )
-}
-
 #[test]
 fn reads_the_specimen_passport_dates() {
     let domain = 42;
@@ -531,4 +517,22 @@ fn refuses_an_opening_for_a_field_that_does_not_exist() {
         42,
         17,
     );
+}
+
+// Helpers for the tests above. They read the generated fixtures, which is
+// why this package depends on testdata at all, and they sit here so that
+// every fixture reference in the file is below the first test.
+
+fn td3_expected_binding(domain: Field) -> Field {
+    dg_binding(
+        hash32_to_fields(sha256_bounded(testdata::TD3_DG1, testdata::TD3_DG1_LEN)),
+        domain,
+    )
+}
+
+fn td1_expected_binding(domain: Field) -> Field {
+    dg_binding(
+        hash32_to_fields(sha256_bounded(testdata::TD1_DG1, testdata::TD1_DG1_LEN)),
+        domain,
+    )
 }

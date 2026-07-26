@@ -17,6 +17,7 @@ mod keys;
 mod manifest;
 mod rsa;
 mod scratch;
+mod templates;
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -55,6 +56,17 @@ fn main() {
             });
 
         manifest::write(circuits_root, &destination);
+
+        return;
+    }
+
+    if std::env::args().nth(1).as_deref() == Some("templates") {
+        let circuits_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("unexpected generator location");
+
+        templates::write(circuits_root);
 
         return;
     }

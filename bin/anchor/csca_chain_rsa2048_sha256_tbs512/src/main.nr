@@ -49,20 +49,6 @@ fn main(
     )
 }
 
-fn master_list() -> ([Field; 10], Field) {
-    let mut siblings: [Field; 10] = [0; 10];
-
-    let mut current = commit::modulus_hash(testdata::CHAIN_CSCA_MODULUS_LIMBS);
-
-    for level in 0..10 {
-        siblings[level] = (level as Field) + 900;
-
-        current = commit::hash_pair(current, siblings[level]);
-    }
-
-    (siblings, current)
-}
-
 #[test]
 fn certifies_the_document_signer() {
     let (siblings, root) = master_list();
@@ -115,4 +101,22 @@ fn rejects_an_unset_context() {
         42,
         0,
     );
+}
+
+// Helpers for the tests above. They read the generated fixtures, which is
+// why this package depends on testdata at all, and they sit here so that
+// every fixture reference in the file is below the first test.
+
+fn master_list() -> ([Field; 10], Field) {
+    let mut siblings: [Field; 10] = [0; 10];
+
+    let mut current = commit::modulus_hash(testdata::CHAIN_CSCA_MODULUS_LIMBS);
+
+    for level in 0..10 {
+        siblings[level] = (level as Field) + 900;
+
+        current = commit::hash_pair(current, siblings[level]);
+    }
+
+    (siblings, current)
 }

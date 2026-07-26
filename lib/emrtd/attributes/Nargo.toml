@@ -10,4 +10,7 @@ hash = { path = "../../core/hash" }
 mrz = { path = "../../emrtd/mrz" }
 predicate = { path = "../../claims/predicate" }
 normalize = { path = "../../core/normalize" }
+# testdata is used only by the tests in this package. Nargo has no
+# dev-dependencies section, so this says it instead. No fixture value
+# reaches the compiled circuit; the bytecode is checked for that.
 testdata = { path = "../../testdata" }

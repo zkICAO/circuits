@@ -17,8 +17,6 @@ use std::path::Path;
 
 /// Packages that solve a witness and are never proved.
 pub fn write(circuits_root: &Path, destination: &Path) {
-    let members = workspace_members(circuits_root);
-
     let mut body = String::from(
         "# Public input order per circuit, generated from the compiled ABIs.\n\
          # Each name is one field element, in the order Barretenberg lays them out.\n\
@@ -28,32 +26,16 @@ pub fn write(circuits_root: &Path, destination: &Path) {
 
     let mut written = 0;
 
-    for member in &members {
-        let manifest = circuits_root.join(member).join("Nargo.toml");
-
-        // Only circuits have public inputs. Libraries compile into the
-        // circuits that use them and produce no bytecode of their own.
-        if package_field(&manifest, "type") != "bin" {
-            continue;
-        }
-
-        // Witness tools live under tools/ and are executed, never proved,
-        // so no verifier reads their public inputs. Excluding them by path
-        // rather than by name means the next tool cannot be forgotten here.
-        if member.starts_with("tools/") {
-            continue;
-        }
-
-        let package = package_field(&manifest, "name");
-
-        let bytecode = circuits_root.join(format!("target/{package}.json"));
+    for package in circuit_packages(circuits_root) {
+        let bytecode = circuits_root.join(format!("target/{}.json", package.name));
 
         assert!(
             bytecode.exists(),
-            "{package} is a workspace member but has not been compiled; run nargo compile first"
+            "{} is a workspace member but has not been compiled; run nargo compile first",
+            package.name
         );
 
-        writeln!(body, "{package} {}", public_inputs(&bytecode)).unwrap();
+        writeln!(body, "{} {}", package.name, public_inputs(&bytecode)).unwrap();
 
         written += 1;
     }
@@ -68,6 +50,71 @@ pub fn write(circuits_root: &Path, destination: &Path) {
 /// Only packages the workspace declares. Reading the build directory instead
 /// would carry forward anything left behind by a package that has been
 /// removed.
+/// A circuit package: the name the backend knows it by and where it lives.
+pub struct Package {
+    pub name: String,
+    pub directory: String,
+}
+
+/// One input a circuit takes, with the number of field elements it occupies
+/// when it is an array.
+pub struct Parameter {
+    pub name: String,
+    pub length: Option<usize>,
+}
+
+/// Every compiled circuit in the workspace, excluding the witness tools by
+/// their path: they are executed and never proved, so nothing consumes a
+/// public input table or an input template for them.
+pub fn circuit_packages(circuits_root: &Path) -> Vec<Package> {
+    let mut packages = Vec::new();
+
+    for member in workspace_members(circuits_root) {
+        if member.starts_with("tools/") {
+            continue;
+        }
+
+        let manifest = circuits_root.join(&member).join("Nargo.toml");
+
+        if package_field(&manifest, "type") != "bin" {
+            continue;
+        }
+
+        packages.push(Package {
+            name: package_field(&manifest, "name"),
+            directory: member,
+        });
+    }
+
+    packages
+}
+
+/// Every input a circuit takes, in declaration order, private and public
+/// alike, since a witness has to supply all of them.
+pub fn parameters(bytecode: &Path) -> Vec<Parameter> {
+    let text = std::fs::read_to_string(bytecode).expect("cannot read compiled bytecode");
+
+    let abi = json::section(&text, "\"abi\":").expect("compiled output has no abi");
+
+    let mut out = Vec::new();
+
+    for parameter in
+        json::array_items(&json::field(&abi, "parameters").expect("abi has no parameters"))
+    {
+        let name = json::string(&parameter, "name").expect("a parameter has no name");
+
+        let slots =
+            json::slot_count(&json::field(&parameter, "type").expect("a parameter has no type"));
+
+        out.push(Parameter {
+            name,
+            length: (slots > 1).then_some(slots),
+        });
+    }
+
+    out
+}
+
 fn workspace_members(circuits_root: &Path) -> Vec<String> {
     let text = std::fs::read_to_string(circuits_root.join("Nargo.toml"))
         .expect("cannot read the workspace manifest");

@@ -105,6 +105,12 @@ Three trees carry the values a verifier decides for itself: a signer registry at
 
 A tree of a few hundred entries at depth sixteen is mostly empty, so padding is part of the format: an absent leaf is zero and every level above is that level's empty root paired with itself. It is a convention rather than a caller's choice, because a published root and a circuit walking a path to it are comparable only if both padded the same way. `tools/merkle_path` implements it, tested at every index at all three depths against the same path walk the circuits use.
 
+## Inputs, and why none of them are committed
+
+A witness holds one holder's document, so no working one is in this repository. What is committed instead is `Prover.toml.example` beside every circuit, generated from the compiled ABI by `cargo run -- templates`, with the field names the circuit takes, a placeholder in every value, and a note saying where each value comes from: a chip read, an earlier proof's output, or one of the witness tools. Copy it to `Prover.toml`, which is ignored, and fill it in. Generating from the ABI is what stops a template describing inputs a circuit no longer takes.
+
+Test material stays on the test side of every file. Nargo has no dev-dependencies section, so the packages whose tests read the generated fixtures declare `testdata` as an ordinary dependency and say in a comment that it is test only; the rule that makes that true is positional, every fixture reference sits below the first test in its file, and a test in the generator enforces it. Noir does not compile test items into `main`, so no fixture value reaches a circuit.
+
 ## Fixtures
 
 `fixtures/generator` builds complete Doc 9303 material: DG1 wrapping a specimen machine readable zone, a Security Object over DG1 and DG2, CMS signed attributes, an ECDSA or RSA signature, and a Document Signer certificate signed by a country signing key. It has no external crates: DER is emitted directly, openssl handles key generation and signing, and a small big integer implementation computes the Barrett reduction parameter the bignum backend takes.

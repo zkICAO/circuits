@@ -5,5 +5,8 @@ authors = []
 compiler_version = ">=1.0.0"
 
 [dependencies]
+# testdata is used only by the tests in this package. Nargo has no
+# dev-dependencies section, so this says it instead. No fixture value
+# reaches the compiled circuit; the bytecode is checked for that.
 testdata = { path = "../../testdata" }
 bignum = { tag = "v0.9.2-1", git = "https://github.com/zkpassport/noir-bignum" }

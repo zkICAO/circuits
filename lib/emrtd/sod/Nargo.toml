@@ -8,4 +8,7 @@ compiler_version = ">=1.0.0"
 cms = { path = "../../emrtd/cms" }
 commit = { path = "../../core/commit" }
 hash = { path = "../../core/hash" }
+# testdata is used only by the tests in this package. Nargo has no
+# dev-dependencies section, so this says it instead. No fixture value
+# reaches the compiled circuit; the bytecode is checked for that.
 testdata = { path = "../../testdata" }
