@@ -309,6 +309,78 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         proving,
     );
 
+    // 8. The four document proofs folded into one recursive proof. The
+    //    witness needs the inner proofs themselves, so this step exists only
+    //    when proving. The key hashes are compiled into the circuit, which is
+    //    what makes proving fail against any other variant set.
+    if proving {
+        let mut witness = String::new();
+
+        for (prefix, name) in [
+            ("sod", "sod"),
+            ("dg_extract", "dg_extract"),
+            ("attributes", "attributes"),
+            ("anchor", "anchor"),
+        ] {
+            field_elements(
+                &mut witness,
+                &format!("{prefix}_key"),
+                &out.join(name).join("vk"),
+            );
+
+            field_elements(
+                &mut witness,
+                &format!("{prefix}_proof"),
+                &out.join(name).join("proof"),
+            );
+        }
+
+        value(&mut witness, "econtent_binding", &econtent_binding);
+        value(&mut witness, "dsc_commitment", &dsc_commitment);
+        value(&mut witness, "secret_binding", &secret_binding);
+        value(&mut witness, "dg_binding", &dg_binding);
+        value(&mut witness, "commitment", &commitment);
+        value(&mut witness, "current_yyyymmdd", TODAY);
+        value(&mut witness, "registry_root", &registry_root);
+        value(&mut witness, "domain", DOMAIN);
+        value(&mut witness, "context", CONTEXT);
+
+        let registration = run_circuit(
+            circuits_root,
+            "registration_mrz_td3_ecdsa_p256_sha256_ec512_inclusion",
+            &witness,
+        );
+
+        assert_eq!(
+            registration[0], commitment,
+            "the registration proof must expose the commitment it aggregated"
+        );
+
+        assert_eq!(
+            registration[1], secret_binding,
+            "the registration proof must expose the secret binding it aggregated"
+        );
+
+        assert_eq!(
+            numeric(&registration[2]),
+            numeric(TODAY),
+            "the registration proof must expose the date the attributes resolved against"
+        );
+
+        assert_eq!(
+            registration[3], registry_root,
+            "the registration proof must expose the registry it anchored to"
+        );
+
+        prove(
+            circuits_root,
+            out,
+            "registration_mrz_td3_ecdsa_p256_sha256_ec512_inclusion",
+            "registration",
+            proving,
+        );
+    }
+
     Bundle {
         directory: out.to_path_buf(),
         econtent_binding,
@@ -499,6 +571,44 @@ fn prove(circuits_root: &Path, out: &Path, package: &str, name: &str, proving: b
     );
 
     println!("  {name}: proved and verified");
+}
+
+/// Writes a file of whole 32 byte field elements as a witness array, which is
+/// how a verification key or a proof enters the registration witness: the
+/// binary bb writes is already field elements laid end to end.
+fn field_elements(witness: &mut String, name: &str, path: &Path) {
+    let data =
+        std::fs::read(path).expect("a bundle entry the registration witness needs is missing");
+
+    assert!(
+        data.len().is_multiple_of(32),
+        "field element data must be whole 32 byte elements"
+    );
+
+    let fields: Vec<String> = data
+        .chunks(32)
+        .map(|chunk| {
+            let mut element = String::from("0x");
+
+            for byte in chunk {
+                write!(element, "{byte:02x}").unwrap();
+            }
+
+            element
+        })
+        .collect();
+
+    array(witness, name, &fields);
+}
+
+/// Reads a value nargo may have printed in hex or that a constant states in
+/// decimal, for comparing the two.
+fn numeric(text: &str) -> u64 {
+    if let Some(hex) = text.strip_prefix("0x") {
+        u64::from_str_radix(hex, 16).expect("a numeric output does not fit")
+    } else {
+        text.parse().expect("a numeric output does not parse")
+    }
 }
 
 fn bytes(out: &mut String, name: &str, value: &[u8], width: usize) {

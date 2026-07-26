@@ -21,6 +21,8 @@ sod                                        did the signer sign this document
 
 Proofs are linked by equalities between their public values, not by trust in any one of them. The off-chain verifier in [zkICAO/prover](https://github.com/zkICAO/prover) enforces that checklist so an integration does not carry its own copy.
 
+A registration circuit verifies the anchor, sod, dg-extract and attributes proofs recursively and publishes their linked outputs, so a relying party can take one proof where the equalities hold by construction instead of four proofs and a checklist. The inner verification key hashes are compiled in, from a generated `keys.nr` written by `cargo run -- keys`. The predicates and the nullifier stay separate, because a document registers once and gets asked questions per session. One property of the backend matters when integrating: producing a proof does not check the witness, so a registration proof over a forged inner proof is produced without complaint and rejected when verified. Verification is the only outcome that means anything.
+
 Doc 9303 makes DG1 (the machine readable zone) mandatory on every compliant document, so profiles that read DG1 are what keep the core portable across issuing states. Data groups an individual state defines, such as DG13, are opt-in enrichment and are not implemented.
 
 ## Circuits
@@ -43,6 +45,7 @@ Measured with `nargo info`, ACIR opcodes:
 | `predicate/compare` | 123 | a field is within a range |
 | `predicate/reveal` | 100 | a field, disclosed verbatim |
 | `nullifier/document_number` | 58 | scoped uniqueness for one document |
+| `registration/mrz_td3_ecdsa_p256_sha256_ec512_inclusion` | 17 | the four document proofs, verified recursively as one |
 
 The Security Object signature dominates and runs once. Everything a verifier actually asks about costs two or three orders of magnitude less, which is why the signature check and the data group extraction are separate circuits rather than one.
 
@@ -78,6 +81,7 @@ A circuit is `bin/<phase>/<instantiation>`, and its package is `<phase>_<instant
 | `anchor` | mode, then algorithm | `dsc_inclusion`, `csca_chain_rsa2048_sha256_tbs512` |
 | `predicate` | the statement | `compare` |
 | `nullifier` | the policy | `document_number` |
+| `registration` | the aggregated variant set | `mrz_td3_ecdsa_p256_sha256_ec512_inclusion` |
 
 Underscores rather than hyphens throughout: Nargo rejects a package name containing a hyphen.
 
@@ -106,7 +110,7 @@ The off-chain verifier consumes the result. It returns what a bundle proved, not
 - Chip authentication of any kind, so a cloned chip carrying genuine data is not detected
 - TD2, which Doc 9303 defines alongside TD1 and TD3
 - Digest algorithms other than SHA-256, and signature algorithms beyond the variants listed above
-- Recursive aggregation, which on-chain verification would need
+- Any on-chain verifier: the registration proof is what such a deployment would verify, and no contract exists
 - Nullifier policies that survive document reissue, which need a secret that is not chip bound
 
 ## Toolchain

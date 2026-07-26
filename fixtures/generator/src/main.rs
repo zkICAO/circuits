@@ -13,6 +13,7 @@ mod cert;
 mod der;
 mod ec;
 mod icao;
+mod keys;
 mod manifest;
 mod rsa;
 mod scratch;
@@ -54,6 +55,17 @@ fn main() {
             });
 
         manifest::write(circuits_root, &destination);
+
+        return;
+    }
+
+    if std::env::args().nth(1).as_deref() == Some("keys") {
+        let circuits_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("unexpected generator location");
+
+        keys::write(circuits_root);
 
         return;
     }
