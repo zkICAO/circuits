@@ -24,9 +24,15 @@
 //! key over the same digest; substituting one for the other neither
 //! creates a signature the issuer did not produce nor lets a prover
 //! satisfy the circuit without one. Doing it outside the circuit keeps
-//! the gate count unchanged. Witness preparation is where it belongs, and
-//! no such code exists yet: until it does, every caller has to normalize
-//! for itself.
+//! the gate count unchanged. Witness preparation is where it belongs: the
+//! fixture generator normalizes the signatures it emits, and anything that
+//! builds witnesses from a real document has to do the same.
+//!
+//! The rejection is also what keeps the document secret canonical. That
+//! secret is derived from the signature bytes, so if both (r, s) and
+//! (r, n - s) verified, one document would yield two secrets and therefore
+//! two nullifiers per application. With s above n/2 rejected, exactly one
+//! form of the signature satisfies the circuit.
 
 use bigcurve::curves::secp256r1::{Secp256r1_Fq, Secp256r1_Fr};
 
@@ -89,7 +95,7 @@ pub fn verify_ecdsa_p384<let H: u32>(
 
     s.validate_in_field();
 
-    assert(verify_secp384r1_ecdsa(x, y, msg_hash, (r, s)), "sig: ecdsa p256 verification failed");
+    assert(verify_secp384r1_ecdsa(x, y, msg_hash, (r, s)), "sig: ecdsa p384 verification failed");
 }
 
 /// Brainpool P-384r1, the other 384 bit curve Doc 9303 permits. Some
@@ -119,7 +125,7 @@ pub fn verify_ecdsa_brainpool384r1<let H: u32>(
 
     assert(
         verify_brainpoolp384r1_ecdsa(x, y, msg_hash, (r, s)),
-        "sig: ecdsa p256 verification failed",
+        "sig: ecdsa brainpool p384r1 verification failed",
     );
 }
 
@@ -160,6 +166,47 @@ fn p256_sha256_openssl_vector() {
     ];
 
     verify_ecdsa_p256(x, y, hash, r, s);
+}
+
+// The same signing act in its high s form, s replaced by n - s. Both forms
+// verify under textbook ECDSA, and the document secret is derived from the
+// signature bytes, so accepting both would give one document two secrets
+// and two nullifiers per application. The backend must therefore refuse
+// this form, and this test is what turns that requirement from a claim
+// about a dependency into a property checked here.
+#[test(should_fail_with = "Signature s value is not in canonical form")]
+fn p256_rejects_the_high_s_form_of_a_valid_signature() {
+    let hash: [u8; 32] = [
+        0x32, 0x30, 0x0b, 0x13, 0x52, 0x02, 0x92, 0x12, 0x60, 0x72, 0x06, 0x77, 0x53, 0x81, 0x75,
+        0x54, 0x74, 0x27, 0x91, 0xeb, 0x70, 0x6a, 0x77, 0x5d, 0xb3, 0x60, 0x6d, 0x8e, 0xa9, 0x81,
+        0x95, 0xe7,
+    ];
+
+    let x: [u8; 32] = [
+        0x30, 0xe5, 0xea, 0x5e, 0x62, 0x22, 0x7f, 0xbc, 0x6b, 0x71, 0xe3, 0xad, 0x3b, 0x96, 0x6c,
+        0xb6, 0x27, 0x2d, 0x0f, 0x1f, 0x80, 0xcb, 0x9c, 0x39, 0xe1, 0x77, 0xf7, 0x15, 0x86, 0xe6,
+        0xbf, 0x88,
+    ];
+
+    let y: [u8; 32] = [
+        0xeb, 0xd8, 0x6f, 0x0a, 0x27, 0x0a, 0xd9, 0x25, 0x10, 0xb7, 0x37, 0xe4, 0x41, 0x6a, 0x0a,
+        0x50, 0xda, 0x80, 0x14, 0x89, 0xdd, 0x25, 0x32, 0x85, 0x3c, 0xb4, 0xa5, 0xb0, 0x13, 0x3f,
+        0x6a, 0xfb,
+    ];
+
+    let r: [u8; 32] = [
+        0x3f, 0x91, 0x7b, 0xaf, 0x46, 0xfd, 0xdc, 0xe8, 0x5d, 0x6c, 0xb2, 0x9c, 0x1e, 0xf8, 0xa4,
+        0xce, 0xe5, 0x25, 0x54, 0x75, 0xa5, 0xd5, 0xb5, 0x64, 0xb0, 0x8f, 0x71, 0xa2, 0x50, 0xdc,
+        0xd6, 0xb9,
+    ];
+
+    let s_high: [u8; 32] = [
+        0x9d, 0xd7, 0xb3, 0xbe, 0xaa, 0x27, 0x32, 0xc8, 0x62, 0xfb, 0x18, 0x5e, 0x86, 0x6a, 0xcd,
+        0xce, 0x9e, 0xf8, 0x56, 0xad, 0x2b, 0x71, 0x76, 0x4a, 0x0e, 0xbd, 0xdc, 0xdb, 0x4a, 0x84,
+        0x01, 0xdb,
+    ];
+
+    verify_ecdsa_p256(x, y, hash, r, s_high);
 }
 
 #[test(should_fail_with = "sig: ecdsa p256 verification failed")]
