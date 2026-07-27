@@ -498,13 +498,7 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         proving,
     );
 
-    let mut challenge = [0u8; 32];
-
-    let context_value: u128 = context().parse().expect("the context is a number");
-
-    for (index, byte) in context_value.to_be_bytes().iter().enumerate() {
-        challenge[16 + index] = *byte;
-    }
+    let challenge = icao::challenge_for_context(&context());
 
     let chip_signature = ec::sign_sha256(&chip_key, &challenge);
 
@@ -517,7 +511,7 @@ pub fn build(circuits_root: &Path, out: &Path, proving: bool) -> Bundle {
         "key_offset",
         &(2 + cert::public_key_offset_in_spki(&chip_spki)).to_string(),
     );
-    bytes(&mut witness, "challenge", &challenge, 32);
+    bytes(&mut witness, "challenge", &challenge, 8);
     bytes(&mut witness, "signature_r", &chip_signature.r, 32);
     bytes(&mut witness, "signature_s", &chip_signature.s, 32);
     value(&mut witness, "dg_binding", &chip_binding);

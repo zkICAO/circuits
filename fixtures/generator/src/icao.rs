@@ -286,3 +286,79 @@ pub fn build_dg15(spki: &[u8]) -> Vec<u8> {
 
     out
 }
+
+/// The Active Authentication challenge for a session. INTERNAL AUTHENTICATE
+/// takes exactly eight bytes, so the challenge is the first eight bytes of
+/// SHA-256 over the context's 32 byte big endian form, which is the same
+/// derivation the chip circuit enforces. A terminal derives it the same way,
+/// so issuing a challenge needs nothing beyond the context itself.
+pub fn challenge_for_context(context: &str) -> [u8; 8] {
+    let digest = crate::ec::sha256(&context_be_bytes(context));
+
+    let mut out = [0u8; 8];
+
+    out.copy_from_slice(&digest[..8]);
+
+    out
+}
+
+/// A decimal field element as the 32 byte big endian value the circuit's
+/// byte decomposition produces.
+fn context_be_bytes(context: &str) -> [u8; 32] {
+    let mut out = [0u8; 32];
+
+    for character in context.trim().bytes() {
+        assert!(
+            character.is_ascii_digit(),
+            "icao: the context is not a decimal number"
+        );
+
+        let mut carry = u32::from(character - b'0');
+
+        for byte in out.iter_mut().rev() {
+            let value = u32::from(*byte) * 10 + carry;
+
+            *byte = (value & 0xff) as u8;
+
+            carry = value >> 8;
+        }
+
+        assert!(carry == 0, "icao: the context does not fit 32 bytes");
+    }
+
+    out
+}
+
+#[cfg(test)]
+mod challenge_tests {
+    use super::*;
+
+    #[test]
+    fn a_decimal_context_converts_to_its_big_endian_bytes() {
+        let bytes = context_be_bytes("99");
+
+        assert_eq!(bytes[31], 99);
+
+        assert!(bytes[..31].iter().all(|byte| *byte == 0));
+
+        let carried = context_be_bytes("65793");
+
+        assert_eq!(&carried[29..], &[1, 1, 1]);
+    }
+
+    #[test]
+    fn a_context_wider_than_a_u128_still_converts() {
+        // 2^128 exactly, which the previous chip witness path could not
+        // represent and a sender address routinely exceeds.
+        let bytes = context_be_bytes("340282366920938463463374607431768211456");
+
+        assert_eq!(bytes[15], 1);
+
+        assert!(bytes[16..].iter().all(|byte| *byte == 0));
+    }
+
+    #[test]
+    fn different_sessions_get_different_challenges() {
+        assert_ne!(challenge_for_context("99"), challenge_for_context("100"));
+    }
+}

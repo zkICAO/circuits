@@ -14,7 +14,7 @@ dg15_len = "<your dg15 len>"
 
 key_offset = "<your key offset>"
 
-challenge = ["<your challenge>", "<your challenge>", "..."]  # 32 elements in total
+challenge = ["<your challenge>", "<your challenge>", "..."]  # 8 elements in total
 
 # r of the signature over the signed attributes, 32 bytes
 signature_r = ["<your signature r>", "<your signature r>", "..."]  # 32 elements in total

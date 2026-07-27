@@ -12,11 +12,14 @@
 //! produced from a copy of the data, because the copy does not have the
 //! private key.
 //!
-//! The challenge is the session context, which every circuit already carries
-//! and which the verifier already issues fresh per exchange. That is not a
-//! coincidence to be tidied later: a value the verifier chooses per session
-//! and that enters no derived value is exactly what a challenge is, so the
-//! two are one field rather than two.
+//! The challenge is eight bytes because the chip's INTERNAL AUTHENTICATE
+//! command takes exactly eight, so anything wider could never be signed by
+//! real hardware. It still has to belong to this session, and the session is
+//! named by the context, so the challenge is a fixed derivation of it: the
+//! first eight bytes of SHA-256 over the context's 32 byte big endian form.
+//! The terminal derives the same bytes to issue the challenge, and the
+//! circuit re-derives them, which ties the answer to this exchange without
+//! adding a second session value.
 //!
 //! What this does not do. It proves the chip that answered holds the private
 //! key whose public half is in this document's DG15. A relay, a terminal
@@ -49,16 +52,16 @@ pub struct Presence {
 /// in this document. The key is then read out of the data group rather than
 /// taken as an input, which is what makes it that key and not one the prover
 /// chose.
-/// The challenge the chip answered, as bytes. The verifier's session
-/// context is the challenge, so this is that value big endian, and the
-/// caller asserts the two are the same number: a signature over anything
-/// else would prove presence at some moment other than this exchange.
+///
+/// The caller asserts the challenge belongs to its session with
+/// `assert_challenge_for_context`; a signature over anything else would
+/// prove presence at some moment other than this exchange.
 pub fn prove_presence_p256<let N: u32>(
     dg15: [u8; N],
     dg15_len: u32,
     key_offset: u32,
     expected_dg_binding: Field,
-    challenge: [u8; 32],
+    challenge: [u8; 8],
     signature_r: [u8; 32],
     signature_s: [u8; 32],
     domain: Field,
@@ -79,26 +82,23 @@ pub fn prove_presence_p256<let N: u32>(
     // The chip signs a digest of the challenge, not the challenge itself,
     // which is what the standard's elliptic curve variant does and what any
     // signing interface expects.
-    let digest = sha256_bounded(challenge, 32);
+    let digest = sha256_bounded(challenge, 8);
 
     sig::verify_ecdsa_p256(x, y, digest, signature_r, signature_s);
 
     Presence { dg_binding: binding }
 }
 
-/// The challenge as a number, so a caller can require it to equal the
-/// session context it published. Big endian, which is how every other byte
-/// value in this protocol packs.
-pub fn challenge_value(challenge: [u8; 32]) -> Field {
-    let mut value: Field = 0;
+/// Requires the challenge to be this session's: the first eight bytes of
+/// SHA-256 over the context's canonical 32 byte big endian form. The
+/// terminal computes the same bytes when it issues the challenge, so the
+/// two sides need to share nothing beyond the context itself.
+pub fn assert_challenge_for_context(challenge: [u8; 8], context: Field) {
+    let context_bytes: [u8; 32] = context.to_be_bytes();
 
-    // The top byte is dropped: a 32 byte value can exceed the field, and a
-    // session context is far smaller than 31 bytes.
-    assert(challenge[0] == 0, "chip: challenge does not fit a field element");
+    let derived = sha256_bounded(context_bytes, 32);
 
-    for i in 1..32 {
-        value = value * 256 + challenge[i] as Field;
+    for i in 0..8 {
+        assert(challenge[i] == derived[i], "chip: the challenge is not this session's context");
     }
-
-    value
 }

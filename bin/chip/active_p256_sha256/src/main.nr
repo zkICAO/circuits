@@ -19,26 +19,23 @@ fn main(
     dg15: [u8; 128],
     dg15_len: u32,
     key_offset: u32,
-    challenge: [u8; 32],
+    challenge: [u8; 8],
     signature_r: [u8; 32],
     signature_s: [u8; 32],
     dg_binding: pub Field,
     domain: pub Field,
     context: pub Field,
-) -> pub Field {
+) {
     assert(domain != 0, "chip: domain must be set");
 
     assert(context != 0, "chip: context must be set");
 
-    // The challenge is the context. Requiring them equal is what makes this
-    // a proof about this exchange rather than about some earlier one whose
-    // answer the prover kept.
-    assert(
-        chip::challenge_value(challenge) == context,
-        "chip: the challenge is not this session's context",
-    );
+    // The challenge is derived from the context. Requiring that is what
+    // makes this a proof about this exchange rather than about some earlier
+    // one whose answer the prover kept.
+    chip::assert_challenge_for_context(challenge, context);
 
-    let presence = chip::prove_presence_p256(
+    let _ = chip::prove_presence_p256(
         dg15,
         dg15_len,
         key_offset,
@@ -48,8 +45,6 @@ fn main(
         signature_s,
         domain,
     );
-
-    presence.dg_binding
 }
 
 // Helpers for the tests below read the generated fixtures, which is why this

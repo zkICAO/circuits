@@ -792,12 +792,9 @@ fn emit_chip_key(body: &mut String, work_dir: &scratch::Scratch) {
     // itself sits after DG15's own two byte template header.
     let key_offset = 2 + cert::public_key_offset_in_spki(&spki);
 
-    // The challenge is the session context as a 32 byte big endian value. A
-    // real terminal draws one fresh per read; the circuit requires it to
-    // equal the context the verifier published, which is the same thing.
-    let mut challenge = [0u8; 32];
-
-    challenge[31] = 99;
+    // Eight bytes derived from the session context, the same derivation the
+    // circuit enforces, for the context the chip tests use.
+    let challenge = icao::challenge_for_context("99");
 
     // The chip signs a digest of the challenge, which is what an elliptic
     // curve signing interface does and what the circuit recomputes.
@@ -821,7 +818,7 @@ fn emit_chip_key(body: &mut String, work_dir: &scratch::Scratch) {
 
     emit_u32(body, "DG15_KEY_OFFSET", key_offset);
 
-    emit_bytes(body, "DG15_CHALLENGE", &challenge, 32);
+    emit_bytes(body, "DG15_CHALLENGE", &challenge, 8);
 
     emit_bytes(body, "DG15_SIGNATURE_R", &signature.r, 32);
 
