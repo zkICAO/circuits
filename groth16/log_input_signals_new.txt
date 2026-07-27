@@ -1,9 +1,0 @@
-fieldId 1 0
-commitment 1 0
-minimum 1 0
-maximum 1 0
-domain 1 0
-length 1 0
-data 4 0
-entropy 1 0
-siblings 4 0
