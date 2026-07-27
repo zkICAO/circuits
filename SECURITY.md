@@ -22,7 +22,7 @@ Anything that lets a prover establish something false, or a verifier learn somet
 
 These are documented rather than reported. `threat-model.md` in the [docs repository](https://github.com/zkICAO/docs) is the full list; the ones most often mistaken for bugs are:
 
-- Chip authentication is not implemented, so a cloned chip carrying genuine data is indistinguishable from the original
+- A copy of a chip's data produces every proof except the chip presence one, so a bundle that does not demand `ChipPresent` does not distinguish a copy from the original, and a relay of a genuine chip is not distinguishable by any proof
 - Without an anchor proof, a bundle establishes that some key signed the document and nothing about whose key it is
 - A nullifier built on the document signature does not survive document reissue, and nothing deduplicates a holder across two different documents
 - The date a proof resolves two digit years against is a public input; a verifier that does not pin it accepts whatever the prover chose

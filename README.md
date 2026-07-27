@@ -2,7 +2,7 @@
 
 Noir circuits for privacy preserving verification of electronic identity documents, proved with UltraHonk (Barretenberg).
 
-The first target is ICAO Doc 9303 (Machine Readable Travel Documents): ePassports and national eID cards that carry a contactless chip. Other ICAO specifications are out of scope for now and will be considered on their own merits rather than assumed to fit.
+The first target is ICAO Doc 9303 (Machine Readable Travel Documents): ePassports and national eID cards that carry a contactless chip. Other ICAO specifications are not yet in scope and will be considered on their own merits rather than assumed to fit.
 
 Status: early development. The chain below runs end to end against generated documents, and a proof over one of them verifies. Names, layouts and binding formats can still change, and the coverage gaps at the bottom of this page are real.
 
@@ -31,15 +31,21 @@ Measured with `nargo info`, ACIR opcodes:
 
 | Circuit | Opcodes | What it proves |
 |---|---:|---|
-| `sod/ecdsa_p256_sha256_ec1024` | 38034 | the signer signed the Security Object, ECDSA over P-256 |
+| `sod/ecdsa_p384_sha256_ec512` | 65850 | the signer signed the Security Object, ECDSA over P-384 |
+| `sod/ecdsa_brainpool384r1_sha256_ec512` | 65850 | the same, over Brainpool P-384r1 |
+| `sod/ecdsa_p256_sha256_ec1024` | 38034 | the same, ECDSA over P-256 for a larger Security Object |
 | `sod/ecdsa_p256_sha256_ec512` | 35098 | the same, for a smaller Security Object |
-| `sod/rsa2048_v15_sha256_ec1024` | 11036 | the same, RSA-2048 with PKCS#1 v1.5 |
-| `sod/rsa2048_v15_sha256_ec512` | 8100 | the same, for a smaller Security Object |
+| `chip/active_p256_sha256` | 31262 | the chip itself answered this session's challenge |
+| `sod/rsa4096_v15_sha256_ec512` | 11093 | the Security Object signature, RSA-4096 with PKCS#1 v1.5 |
+| `sod/rsa2048_v15_sha256_ec1024` | 11036 | the same, RSA-2048 for a larger Security Object |
+| `sod/rsa3072_v15_sha256_ec512` | 9516 | the same, RSA-3072 |
+| `sod/rsa2048_v15_sha256_ec512` | 8100 | the same, RSA-2048 |
 | `anchor/csca_chain_rsa2048_sha256_tbs512` | 6841 | a country signing key certified the signer, checked in circuit |
 | `dg_extract/sha256_ec1024` | 6237 | a data group hash the Security Object commits to |
 | `dg_extract/sha256_ec512` | 3301 | the same, for a smaller Security Object |
 | `attributes/mrz_td1_sha256` | 2449 | the fields of a card machine readable zone |
 | `attributes/mrz_td3_sha256` | 2103 | the fields of a passport machine readable zone |
+| `attributes/mrz_td2_sha256` | 1773 | the fields of the other card sized machine readable zone |
 | `anchor/dsc_inclusion` | 340 | the signer key is in a published set |
 | `predicate/member` | 230 | a field is one of a published set |
 | `predicate/compare` | 123 | a field is within a range |
@@ -125,10 +131,9 @@ The off-chain verifier consumes the result. It returns what a bundle proved, not
 
 ## Not implemented
 
-- Chip authentication of any kind, so a cloned chip carrying genuine data is not detected
-- TD2, which Doc 9303 defines alongside TD1 and TD3
+- Chip Authentication, the Diffie Hellman variant of Doc 9303 Part 11, and Active Authentication for RSA chips, which answer under ISO 9796-2 with SHA-1
 - Digest algorithms other than SHA-256, and signature algorithms beyond the variants listed above
-- Deployment and audit: the reference on chain registry in [zkICAO/contracts](https://github.com/zkICAO/contracts) verifies real proofs under test and is deployed nowhere
+- Deployment on a public network, and any third party audit: the reference registry in [zkICAO/contracts](https://github.com/zkICAO/contracts) verifies real proofs under test and on a development chain, and nowhere else
 - Session question compositions beyond the compare and member pair, and any on chain session questions
 - Nullifier policies that survive document reissue, which need a secret that is not chip bound
 

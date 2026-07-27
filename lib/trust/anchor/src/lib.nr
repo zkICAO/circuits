@@ -4,11 +4,12 @@
 //! nothing about whether that key belongs to a state, which is a separate
 //! question and the one this answers.
 //!
-//! The mode here proves the signer key is in a set the verifier published,
-//! which costs a Merkle path and no signature arithmetic. What it assumes is
-//! that whoever built the set checked the certificates behind it. Verifying
-//! the country signing certificate in circuit instead removes that
-//! assumption and is not implemented.
+//! Two modes, differing in who checked what. `prove_signer_is_trusted`
+//! proves the signer key is in a set the verifier published, which costs a
+//! Merkle path and no signature arithmetic, and assumes whoever built the
+//! set checked the certificates behind it. `prove_signer_is_certified`
+//! removes that assumption by verifying the certificate in circuit, and
+//! trusts only the published list of country signing keys.
 //!
 //! The proof does not reveal which signer. Both this circuit and Passive
 //! Authentication publish a salted commitment to the key rather than the key

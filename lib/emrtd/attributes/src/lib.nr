@@ -278,7 +278,6 @@ fn td3_parse<let N: u32>(
     }
 }
 
-/// TD1 is the card layout: three lines of 30 characters.
 /// The card sized travel document layout, two lines of thirty six. It
 /// commits the same nine fields under the same identifiers as the other two
 /// profiles, so a predicate written against one works against all three; the
@@ -306,9 +305,9 @@ pub fn td2<let N: u32>(
     }
 }
 
-/// The opening for one field of a passport, for the witness tool. It runs the
-/// same parse, so an opening cannot describe a field differently from the way
-/// the commitment committed to it.
+/// The opening for one field of a card sized travel document, for the
+/// witness tool. It runs the same parse, so an opening cannot describe a
+/// field differently from the way the commitment committed to it.
 pub fn td2_opening<let N: u32>(
     dg1: [u8; N],
     dg1_len: u32,
@@ -413,7 +412,6 @@ fn td2_parse<let N: u32>(
     }
 }
 
-/// TD1 is the card layout: three lines of 30 characters.
 /// The card layout, three lines of thirty. It commits the same nine fields
 /// under the same identifiers as the other two profiles.
 pub fn td1<let N: u32>(

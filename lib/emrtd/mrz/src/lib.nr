@@ -1,4 +1,5 @@
-//! ICAO 9303 MRZ helpers for TD1 (id cards, 3 x 30) and TD3 (passports, 2 x 44).
+//! ICAO Doc 9303 MRZ helpers for the TD1 (3 x 30), TD2 (2 x 36) and TD3
+//! (2 x 44) layouts.
 //!
 //! Field positions are fixed by the standard; check digits use the 7-3-1
 //! weighting. Two digit years are resolved against a verifier supplied

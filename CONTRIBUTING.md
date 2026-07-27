@@ -5,7 +5,7 @@
 The gaps are listed at the bottom of the README and in `threat-model.md` in the [docs repository](https://github.com/zkICAO/docs). The ones where help goes furthest:
 
 - Test vectors from real documents. Everything here runs against synthetic documents the fixture generator builds, so a genuine Security Object from any issuing state, with personal data removed, is worth more than most code contributions. Say which state and which layout it came from.
-- Algorithm and layout coverage. TD2, digest algorithms other than SHA-256, and signature variants beyond those in the README.
+- Algorithm coverage. Digest algorithms other than SHA-256, and signature variants beyond those in the README.
 - Anything in the threat model marked as not protected against.
 
 ## What a change needs to carry
@@ -42,6 +42,6 @@ Commits follow conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `tes
 
 ## Changing a shared value
 
-Binding values, leaf formats, salt conventions and nullifier policies are specified in the docs repository and implemented once in `lib/commit`. Changing one means publishing the revised specification first, then updating the implementation against it. A change that lands here first has no reference to review against.
+Binding values, leaf formats, salt conventions and nullifier policies are specified in the docs repository and implemented once in `lib/core/commit`. Changing one means publishing the revised specification first, then updating the implementation against it. A change that lands here first has no reference to review against.
 
 Public input order is a contract with the verifier. If you change a circuit signature, regenerate `layout.manifest` in the prover repository; its tests fail otherwise, which is the point.

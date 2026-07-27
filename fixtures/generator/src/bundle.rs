@@ -56,7 +56,7 @@ const DOCUMENT_NUMBER_FIELD: &str = "3";
 /// publishes is a real list rather than one entry. The specimen state UTO
 /// and the codes for holders without a nationality are the standard's own.
 const OTHER_COUNTRIES: [&str; 15] = [
-    "UTO", "VNM", "DEU", "FRA", "GBR", "USA", "JPN", "KOR", "SGP", "THA", "IDN", "MYS", "PHL",
+    "UTO", "NLD", "DEU", "FRA", "GBR", "USA", "JPN", "KOR", "SGP", "THA", "IDN", "MYS", "PHL",
     "XXA", "D<<",
 ];
 
